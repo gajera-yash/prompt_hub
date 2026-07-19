@@ -43,7 +43,19 @@ class MockPromptRepository implements PromptRepository {
         ));
       }
     } catch (e) {
-      print('Error loading image generation prompts: \$e');
+      print('Error loading image generation prompts: $e');
+    }
+
+    // Load awesome prompts dataset (1019+ high-quality detailed prompts)
+    try {
+      final jsonString = await rootBundle.loadString('assets/data/awesome_prompts.json');
+      final List<dynamic> jsonList = json.decode(jsonString);
+      
+      for (var jsonItem in jsonList) {
+        _dummyPrompts.add(PromptModel.fromJson(jsonItem as Map<String, dynamic>));
+      }
+    } catch (e) {
+      print('Error loading awesome prompts: $e');
     }
     
     _isInitialized = true;

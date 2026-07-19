@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "660001496000",
+    "project_id": "aiprompthub-dc36d",
+    "storage_bucket": "aiprompthub-dc36d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:660001496000:android:548a4f53951d0ad76b0625",
+        "android_client_info": {
+          "package_name": "com.setuvio.ai_prompt_hub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkR6IWGA4_X1YW_bzyDDEiTqc62x24-5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
