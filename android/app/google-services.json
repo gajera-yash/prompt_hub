@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:660001496000:android:28a354ba805721d86b0625",
+        "android_client_info": {
+          "package_name": "com.ai_prompt_hub.setuvio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkR6IWGA4_X1YW_bzyDDEiTqc62x24-5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:660001496000:android:548a4f53951d0ad76b0625",
         "android_client_info": {
           "package_name": "com.setuvio.ai_prompt_hub"

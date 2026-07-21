@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../providers/data_providers.dart';
 
-class PromptCard extends StatelessWidget {
+class PromptCard extends ConsumerWidget {
   final dynamic prompt;
   final VoidCallback onTap;
 
@@ -33,9 +35,12 @@ class PromptCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final userRating = ref.watch(promptRatingsProvider)[prompt.id] ?? 0.0;
+    final displayRating = userRating > 0 ? userRating : ((prompt.rating as num?)?.toDouble() ?? 4.8);
 
     return GestureDetector(
       onTap: onTap,
@@ -115,7 +120,7 @@ class PromptCard extends StatelessWidget {
                 const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
                 const SizedBox(width: 2),
                 Text(
-                  '${(prompt.rating as num?)?.toDouble() ?? 4.8}',
+                  '${displayRating.toStringAsFixed(1)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,

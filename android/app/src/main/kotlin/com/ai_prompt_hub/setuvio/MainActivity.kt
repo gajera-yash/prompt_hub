@@ -1,4 +1,4 @@
-package com.setuvio.ai_prompt_hub
+package com.ai_prompt_hub.setuvio
 
 import io.flutter.embedding.android.FlutterActivity
 

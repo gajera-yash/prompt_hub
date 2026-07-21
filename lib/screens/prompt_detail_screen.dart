@@ -668,7 +668,7 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
           );
         }
         return SizedBox(
-          height: 255,
+          height: 280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),

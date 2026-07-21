@@ -164,16 +164,7 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
 
-          const Divider(indent: 24, endIndent: 24),
 
-          // Data & Backup Section
-          _buildSectionTitle(context, 'Data & Backup'),
-          _buildListTile(context, LucideIcons.downloadCloud, 'Export Backup (JSON)', () => _exportBackup(context, ref),
-              subtitle: 'Save your prompts to JSON file or clipboard'),
-          _buildListTile(context, LucideIcons.uploadCloud, 'Restore Backup (JSON)', () => _importBackup(context, ref),
-              subtitle: 'Restore prompts from JSON backup text'),
-
-          const Divider(indent: 24, endIndent: 24),
 
           // About
           _buildSectionTitle(context, 'About'),
@@ -190,7 +181,7 @@ class SettingsScreen extends ConsumerWidget {
           }),
           _buildListTile(context, LucideIcons.info, 'App Version', () {}, subtitle: 'v1.0.0'),
           _buildListTile(context, LucideIcons.star, 'Rate App', () async {
-            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.setuvio.ai_prompt_hub&hl=en');
+            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.ai_prompt_hub.setuvio&hl=en');
             try {
               await launchUrl(url, mode: LaunchMode.externalApplication);
             } catch (e) {
