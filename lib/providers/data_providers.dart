@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/prompt_model.dart';
 import '../models/category_model.dart';
 import '../repositories/prompt_repository.dart';
+import '../repositories/hybrid_prompt_repository.dart';
 import '../repositories/category_repository.dart';
 import '../services/local_storage_service.dart';
 
 final promptRepositoryProvider = Provider<PromptRepository>((ref) {
-  return MockPromptRepository();
+  return HybridPromptRepository();
 });
 
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {

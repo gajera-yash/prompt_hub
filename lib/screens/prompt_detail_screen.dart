@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_text_styles.dart';
@@ -209,6 +210,31 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                     ],
                   ),
                 ),
+
+                if (prompt.imageUrl != null && prompt.imageUrl!.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    child: Text('🖼️ Image Preview', style: AppTextStyles.h4),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    width: double.infinity,
+                    height: 250,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: CachedNetworkImage(
+                      imageUrl: prompt.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                      errorWidget: (context, url, error) => const Center(child: Icon(Icons.error)),
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: AppSpacing.xl),
 

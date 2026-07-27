@@ -10,6 +10,7 @@ class PromptModel {
   final bool isFavorite;
   final double rating;
   final int ratingCount;
+  final String? imageUrl;
 
   PromptModel({
     required this.id,
@@ -23,6 +24,7 @@ class PromptModel {
     this.isFavorite = false,
     this.rating = 4.8,
     this.ratingCount = 142,
+    this.imageUrl,
   });
 
   PromptModel copyWith({
@@ -37,6 +39,7 @@ class PromptModel {
     bool? isFavorite,
     double? rating,
     int? ratingCount,
+    String? imageUrl,
   }) {
     return PromptModel(
       id: id ?? this.id,
@@ -50,6 +53,7 @@ class PromptModel {
       isFavorite: isFavorite ?? this.isFavorite,
       rating: rating ?? this.rating,
       ratingCount: ratingCount ?? this.ratingCount,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -65,6 +69,7 @@ class PromptModel {
         'isFavorite': isFavorite,
         'rating': rating,
         'ratingCount': ratingCount,
+        'imageUrl': imageUrl,
       };
 
   factory PromptModel.fromJson(Map<String, dynamic> json) => PromptModel(
@@ -79,5 +84,6 @@ class PromptModel {
         isFavorite: json['isFavorite'] as bool? ?? false,
         rating: (json['rating'] as num?)?.toDouble() ?? 4.8,
         ratingCount: json['ratingCount'] as int? ?? 142,
+        imageUrl: json['imageUrl'] as String?,
       );
 }
