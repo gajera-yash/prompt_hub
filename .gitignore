@@ -43,3 +43,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ─── SECURITY: Sensitive files — DO NOT COMMIT ───
+# Keystore signing key & passwords
+# android/key.properties
+# android/app/*.jks
+# android/app/*.keystore
+
+# Firebase config with API key
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+

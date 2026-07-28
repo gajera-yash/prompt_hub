@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdHelper {
@@ -29,19 +30,77 @@ class AdHelper {
     throw UnsupportedError("Unsupported platform");
   }
 
+  static String get appOpenAdUnitId {
+    if (Platform.isAndroid) {
+      return 'ca-app-pub-3940256099942544/9257395921'; // Test ID
+    } else if (Platform.isIOS) {
+      return 'ca-app-pub-3940256099942544/5575463023'; // Test ID
+    }
+    throw UnsupportedError("Unsupported platform");
+  }
+
   static InterstitialAd? _interstitialAd;
   static int _numInterstitialLoadAttempts = 0;
   static const int maxFailedLoadAttempts = 3;
+  static int _interstitialClickCounter = 0;
+  static const int interstitialFrequency = 3; // Show every 3 actions
 
   static RewardedAd? _rewardedAd;
   static int _numRewardedLoadAttempts = 0;
+
+  static AppOpenAd? _appOpenAd;
+  static bool _isShowingAppOpenAd = false;
 
   static void initialize() {
     MobileAds.instance.initialize();
     _createInterstitialAd();
     _createRewardedAd();
+    loadAppOpenAd();
   }
 
+  // --- App Open Ad ---
+  static void loadAppOpenAd() {
+    AppOpenAd.load(
+      adUnitId: appOpenAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpenAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('AppOpenAd failed to load: $error');
+        },
+      ),
+    );
+  }
+
+  static void showAppOpenAdIfAvailable() {
+    if (!isAppOpenAdAvailable || _isShowingAppOpenAd) {
+      return;
+    }
+    _isShowingAppOpenAd = true;
+    _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) {
+        _isShowingAppOpenAd = true;
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        _isShowingAppOpenAd = false;
+        ad.dispose();
+        _appOpenAd = null;
+      },
+      onAdDismissedFullScreenContent: (ad) {
+        _isShowingAppOpenAd = false;
+        ad.dispose();
+        _appOpenAd = null;
+        loadAppOpenAd();
+      },
+    );
+    _appOpenAd!.show();
+  }
+
+  static bool get isAppOpenAdAvailable => _appOpenAd != null;
+
+  // --- Interstitial Ad ---
   static void _createInterstitialAd() {
     InterstitialAd.load(
         adUnitId: interstitialAdUnitId,
@@ -61,10 +120,39 @@ class AdHelper {
           },
         ));
   }
-  static void showInterstitialAd({void Function()? onAdDismissed}) {
-    // Ads disabled for publishing
-    onAdDismissed?.call();
+
+  static void showInterstitialAd({void Function()? onAdDismissed, bool force = false}) {
+    _interstitialClickCounter++;
+    
+    // Only show if forced or frequency reached
+    if (!force && _interstitialClickCounter % interstitialFrequency != 0) {
+      onAdDismissed?.call();
+      return;
+    }
+
+    if (_interstitialAd == null) {
+      onAdDismissed?.call();
+      return;
+    }
+
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (InterstitialAd ad) {
+        ad.dispose();
+        _createInterstitialAd(); // Reload for next time
+        onAdDismissed?.call();
+      },
+      onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+        ad.dispose();
+        _createInterstitialAd(); // Reload for next time
+        onAdDismissed?.call();
+      },
+    );
+
+    _interstitialAd!.show();
+    _interstitialAd = null;
   }
+
+  // --- Rewarded Ad ---
   static void _createRewardedAd() {
     RewardedAd.load(
         adUnitId: rewardedAdUnitId,
@@ -86,7 +174,7 @@ class AdHelper {
 
   static void showRewardedAd({required void Function(RewardItem) onUserEarnedReward, void Function()? onAdDismissed}) {
     if (_rewardedAd == null) {
-      // If ad isn't ready, just give the reward immediately to not block UX, or show error.
+      // If ad isn't ready, just give the reward immediately to not block UX
       onUserEarnedReward(RewardItem(10, 'coins'));
       onAdDismissed?.call();
       return;
@@ -109,4 +197,5 @@ class AdHelper {
     _rewardedAd = null;
   }
 }
+
 

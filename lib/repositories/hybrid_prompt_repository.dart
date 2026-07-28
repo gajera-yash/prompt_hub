@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/prompt_model.dart';
 import 'prompt_repository.dart';
-
 class HybridPromptRepository implements PromptRepository {
   final MockPromptRepository _mockRepo = MockPromptRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -28,7 +28,7 @@ class HybridPromptRepository implements PromptRepository {
       // Merge them, placing Firebase prompts first so they appear prominently
       _cachedPrompts.insertAll(0, firebasePrompts);
     } catch (e) {
-      print('Error fetching prompts from Firebase: $e');
+      debugPrint('Error fetching prompts from Firebase: $e');
     }
 
     _isInitialized = true;

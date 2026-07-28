@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/prompt_model.dart';
 import 'dart:async';
@@ -43,7 +44,7 @@ class MockPromptRepository implements PromptRepository {
         ));
       }
     } catch (e) {
-      print('Error loading image generation prompts: $e');
+      debugPrint('Error loading image generation prompts: $e');
     }
 
     // Load awesome prompts dataset (1019+ high-quality detailed prompts)
@@ -55,7 +56,7 @@ class MockPromptRepository implements PromptRepository {
         _dummyPrompts.add(PromptModel.fromJson(jsonItem as Map<String, dynamic>));
       }
     } catch (e) {
-      print('Error loading awesome prompts: $e');
+      debugPrint('Error loading awesome prompts: $e');
     }
     
     _isInitialized = true;
