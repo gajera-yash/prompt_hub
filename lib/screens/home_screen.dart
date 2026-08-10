@@ -229,12 +229,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
 
-            // Trending Prompts
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: SectionHeader(
-                  title: '🔥 Trending Prompts',
+                  title: '✨ Just For You',
                   onSeeAll: () {},
                 ),
               ),
@@ -317,9 +316,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildPromptsList() {
-    final trendingAsync = ref.watch(trendingPromptsProvider);
+    final personalizedAsync = ref.watch(personalizedPromptsProvider);
 
-    return trendingAsync.when(
+    return personalizedAsync.when(
       data: (prompts) {
         final displayPrompts = prompts;
 

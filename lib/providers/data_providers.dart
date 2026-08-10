@@ -5,6 +5,7 @@ import '../models/category_model.dart';
 import '../repositories/prompt_repository.dart';
 import '../repositories/category_repository.dart';
 import '../services/local_storage_service.dart';
+import '../models/user_preferences_model.dart';
 
 final promptRepositoryProvider = Provider<PromptRepository>((ref) {
   return HybridPromptRepository();
@@ -71,6 +72,49 @@ final categoryPromptsProvider = FutureProvider.family<List<PromptModel>, String>
 final promptByIdProvider = FutureProvider.family<PromptModel?, String>((ref, id) async {
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getPromptById(id);
+});
+
+// ─── User Preferences & Personalization ───
+final userPreferencesProvider = NotifierProvider<UserPreferencesNotifier, UserPreferencesModel?>(
+  UserPreferencesNotifier.new,
+);
+
+class UserPreferencesNotifier extends Notifier<UserPreferencesModel?> {
+  @override
+  UserPreferencesModel? build() {
+    final storage = ref.watch(localStorageProvider);
+    return storage?.getUserPreferences();
+  }
+
+  Future<void> savePreferences(UserPreferencesModel prefs) async {
+    final storage = ref.read(localStorageProvider);
+    await storage?.saveUserPreferences(prefs);
+    state = prefs;
+  }
+}
+
+final personalizedPromptsProvider = FutureProvider<List<PromptModel>>((ref) async {
+  final repo = ref.watch(promptRepositoryProvider);
+  final allPrompts = await repo.getRecentPrompts();
+  final prefs = ref.watch(userPreferencesProvider);
+
+  if (prefs == null) return [];
+
+  // Filter based on selected goal, tools, and categories
+  List<PromptModel> filtered = allPrompts.where((p) {
+    bool matchesCategory = prefs.selectedCategories.isEmpty ||
+        prefs.selectedCategories.any((c) => p.category.toLowerCase().contains(c.toLowerCase()));
+    
+    // Very basic filtering (in reality we would query backend with specific tags)
+    return matchesCategory;
+  }).toList();
+
+  // If filtered is empty, just return top trending/featured
+  if (filtered.isEmpty) {
+    return allPrompts.take(5).toList();
+  }
+
+  return filtered.take(10).toList();
 });
 
 // ─── Local Storage ───

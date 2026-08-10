@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus;
+import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_text_styles.dart';
@@ -96,8 +97,12 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
             onPressed: () {
               promptAsync.whenData((p) {
                 if (p != null) {
-                  SharePlus.instance.share(
-                    ShareParams(text: p.content, title: p.title),
+                  AdHelper.showInterstitialAd(
+                    onAdDismissed: () {
+                      SharePlus.instance.share(
+                        ShareParams(text: p.content, title: p.title),
+                      );
+                    },
                   );
                 }
               });
@@ -277,7 +282,8 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                     text: 'Copy Prompt',
                     icon: LucideIcons.copy,
                     onPressed: () {
-                      AdHelper.showInterstitialAd(
+                      AdHelper.showRewardedAd(
+                        onUserEarnedReward: (reward) {},
                         onAdDismissed: () {
                           Clipboard.setData(ClipboardData(text: _currentPromptContent));
                           HapticFeedback.selectionClick();
@@ -294,6 +300,48 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                         },
                       );
                     },
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.xl),
+
+                // Actions: AI Direct Launch Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(LucideIcons.bot, size: 20, color: AppColors.primary),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text('Run Prompt Directly', style: AppTextStyles.h4),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            _buildAIIconButton(context, 'ChatGPT', 'https://chatgpt.com', LucideIcons.messageSquare, const Color(0xFF10A37F)),
+                            _buildAIIconButton(context, 'Claude', 'https://claude.ai', LucideIcons.cpu, const Color(0xFFD97757)),
+                            _buildAIIconButton(context, 'Gemini', 'https://gemini.google.com', LucideIcons.sparkles, const Color(0xFF1A73E8)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -314,6 +362,52 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
         },
         loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (e, st) => Center(child: Text('Error loading prompt', style: AppTextStyles.bodyLarge)),
+      ),
+    );
+  }
+
+  Widget _buildAIIconButton(BuildContext context, String label, String url, IconData icon, Color color) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not launch $label')),
+              );
+            }
+          }
+        },
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: AppTextStyles.label.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

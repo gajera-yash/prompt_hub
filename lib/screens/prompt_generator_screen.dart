@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/theme/app_text_styles.dart';
+import '../core/utils/ad_helper.dart';
 import '../widgets/gradient_button.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/banner_ad_widget.dart';
@@ -34,16 +37,19 @@ class _PromptGeneratorScreenState extends State<PromptGeneratorScreen> {
       return;
     }
 
-    setState(() {
-      _isGenerating = true;
-      _generatedPrompt = null;
-    });
+    AdHelper.showRewardedAd(
+      onUserEarnedReward: (reward) {},
+      onAdDismissed: () async {
+        setState(() {
+          _isGenerating = true;
+          _generatedPrompt = null;
+        });
 
-    // Simulate API delay for a premium AI generation feel
-    await Future.delayed(const Duration(milliseconds: 2000));
+        // Simulate API delay for a premium AI generation feel
+        await Future.delayed(const Duration(milliseconds: 2000));
 
-    // Generate a high quality detailed prompt structure based on user input
-    String generated = '''Act as an absolute expert in the relevant field. 
+        // Generate a high quality detailed prompt structure based on user input
+        String generated = '''Act as an absolute expert in the relevant field. 
 
 **Task:**
 I need you to create a comprehensive, high-quality response based on the following core requirement: "$input".
@@ -64,22 +70,31 @@ I need you to create a comprehensive, high-quality response based on the followi
 
 Please begin your response now by acknowledging this role and delivering the requested content.''';
 
-    if (mounted) {
-      setState(() {
-        _generatedPrompt = generated;
-        _isGenerating = false;
-      });
-    }
+        if (mounted) {
+          setState(() {
+            _generatedPrompt = generated;
+            _isGenerating = false;
+          });
+        }
+      },
+    );
   }
 
   void _copyToClipboard() {
     if (_generatedPrompt != null) {
-      Clipboard.setData(ClipboardData(text: _generatedPrompt!));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Prompt copied to clipboard!'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      AdHelper.showRewardedAd(
+        onUserEarnedReward: (reward) {},
+        onAdDismissed: () {
+          Clipboard.setData(ClipboardData(text: _generatedPrompt!));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Prompt copied to clipboard!'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
       );
     }
   }
@@ -214,7 +229,7 @@ Please begin your response now by acknowledging this role and delivering the req
               const BannerAdWidget(),
               const SizedBox(height: AppSpacing.xl),
 
-              // Result Area
+                // Result Area
               if (_generatedPrompt != null) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -249,8 +264,91 @@ Please begin your response now by acknowledging this role and delivering the req
                     ),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xl),
+                // Actions: AI Direct Launch Section
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.bot, size: 20, color: AppColors.primary),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text('Run Prompt Directly', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          _buildAIIconButton(context, 'ChatGPT', 'https://chatgpt.com', LucideIcons.messageSquare, const Color(0xFF10A37F)),
+                          _buildAIIconButton(context, 'Claude', 'https://claude.ai', LucideIcons.cpu, const Color(0xFFD97757)),
+                          _buildAIIconButton(context, 'Gemini', 'https://gemini.google.com', LucideIcons.sparkles, const Color(0xFF1A73E8)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.xxl),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAIIconButton(BuildContext context, String label, String url, IconData icon, Color color) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not launch $label')),
+              );
+            }
+          }
+        },
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: AppTextStyles.label.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

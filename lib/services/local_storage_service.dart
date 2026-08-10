@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user_preferences_model.dart';
 
 class LocalStorageService {
   static LocalStorageService? _instance;
@@ -23,10 +24,25 @@ class LocalStorageService {
   Future<void> setNotificationsEnabled(bool value) =>
       _prefs.setBool('notifications', value);
 
-  // ─── Onboarding ───
+  // ─── Onboarding & Preferences ───
   bool hasSeenOnboarding() => _prefs.getBool('hasSeenOnboarding') ?? false;
   Future<void> setHasSeenOnboarding(bool value) =>
       _prefs.setBool('hasSeenOnboarding', value);
+
+  UserPreferencesModel? getUserPreferences() {
+    final str = _prefs.getString('userPreferences');
+    if (str != null && str.isNotEmpty) {
+      try {
+        return UserPreferencesModel.fromJson(str);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> saveUserPreferences(UserPreferencesModel prefs) =>
+      _prefs.setString('userPreferences', prefs.toJson());
 
   // ─── Saved Prompts ───
   List<String> getSavedPromptIds() =>
