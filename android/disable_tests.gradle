@@ -1,0 +1,20 @@
+project.pluginManager.withPlugin('com.android.library') {
+    project.android {
+        testOptions {
+            unitTests {
+                includeAndroidResources = false
+                all { enabled = false }
+            }
+        }
+    }
+}
+project.pluginManager.withPlugin('com.android.application') {
+    project.android {
+        testOptions {
+            unitTests {
+                includeAndroidResources = false
+                all { enabled = false }
+            }
+        }
+    }
+}
