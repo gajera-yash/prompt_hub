@@ -15,7 +15,7 @@ import '../../screens/prompt_generator_screen.dart';
 import '../../screens/terms_conditions_screen.dart';
 
 final goRouter = GoRouter(
-  initialLocation: '/home',
+  initialLocation: '/splash',
   routes: [
     GoRoute(
       path: '/splash',

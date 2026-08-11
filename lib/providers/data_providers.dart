@@ -100,21 +100,95 @@ final personalizedPromptsProvider = FutureProvider<List<PromptModel>>((ref) asyn
 
   if (prefs == null) return [];
 
-  // Filter based on selected goal, tools, and categories
-  List<PromptModel> filtered = allPrompts.where((p) {
-    bool matchesCategory = prefs.selectedCategories.isEmpty ||
-        prefs.selectedCategories.any((c) => p.category.toLowerCase().contains(c.toLowerCase()));
-    
-    // Very basic filtering (in reality we would query backend with specific tags)
-    return matchesCategory;
-  }).toList();
+  // Map user preferences to category keywords for matching
+  final Map<String, List<String>> goalCategoryMap = {
+    'Content Creation': ['Content', 'Copywriting', 'Writing', 'Blog'],
+    'Coding & Tech': ['Coding', 'React', 'Flutter', 'Tech', 'Development'],
+    'Marketing & Sales': ['Marketing', 'SEO', 'Sales', 'Social Media', 'Email'],
+    'Image Art': ['Image', 'Midjourney', 'Art', 'DALL'],
+    'Productivity': ['Productivity', 'Workflow', 'Planning'],
+    'Business': ['Business', 'Strategy', 'Startup', 'Plan'],
+  };
 
-  // If filtered is empty, just return top trending/featured
-  if (filtered.isEmpty) {
-    return allPrompts.take(5).toList();
+  final Map<String, List<String>> toolCategoryMap = {
+    'ChatGPT': ['ChatGPT', 'Content', 'Copywriting', 'SEO', 'Marketing'],
+    'Gemini': ['Gemini', 'Content', 'Writing'],
+    'Midjourney': ['Midjourney', 'Image', 'Art'],
+    'Claude': ['Claude', 'Content', 'Writing', 'Coding'],
+    'DeepSeek': ['DeepSeek', 'Coding', 'Tech'],
+  };
+
+  // Build a scoring system for prompts
+  List<MapEntry<PromptModel, int>> scored = [];
+
+  for (final prompt in allPrompts) {
+    int score = 0;
+    final promptCategory = prompt.category.toLowerCase();
+    final promptTitle = prompt.title.toLowerCase();
+    final promptContent = prompt.content.toLowerCase();
+
+    // Score based on selected categories (highest weight)
+    for (final cat in prefs.selectedCategories) {
+      if (promptCategory.contains(cat.toLowerCase()) ||
+          promptTitle.contains(cat.toLowerCase()) ||
+          promptContent.contains(cat.toLowerCase())) {
+        score += 3;
+      }
+    }
+
+    // Score based on selected goal
+    if (prefs.selectedGoal != null) {
+      final goalKeywords = goalCategoryMap[prefs.selectedGoal] ?? [];
+      for (final keyword in goalKeywords) {
+        if (promptCategory.contains(keyword.toLowerCase()) ||
+            promptTitle.contains(keyword.toLowerCase()) ||
+            promptContent.contains(keyword.toLowerCase())) {
+          score += 2;
+          break;
+        }
+      }
+    }
+
+    // Score based on selected AI tool
+    if (prefs.selectedTool != null) {
+      final toolKeywords = toolCategoryMap[prefs.selectedTool] ?? [];
+      for (final keyword in toolKeywords) {
+        if (promptCategory.contains(keyword.toLowerCase()) ||
+            promptTitle.contains(keyword.toLowerCase()) ||
+            promptContent.contains(keyword.toLowerCase())) {
+          score += 2;
+          break;
+        }
+      }
+    }
+
+    // Score based on output preference
+    if (prefs.outputPreference != null) {
+      final output = prefs.outputPreference!.toLowerCase();
+      if (output.contains('short') && prompt.content.length < 300) {
+        score += 1;
+      } else if (output.contains('pro') && prompt.content.length > 500) {
+        score += 1;
+      } else if (output.contains('template') && prompt.content.contains('[')) {
+        score += 1;
+      }
+    }
+
+    if (score > 0) {
+      scored.add(MapEntry(prompt, score));
+    }
   }
 
-  return filtered.take(10).toList();
+  // Sort by score (highest first)
+  scored.sort((a, b) => b.value.compareTo(a.value));
+
+  // If no matches, return top trending prompts
+  if (scored.isEmpty) {
+    return allPrompts.take(10).toList();
+  }
+
+  // Return top 10 personalized prompts
+  return scored.take(10).map((e) => e.key).toList();
 });
 
 // ─── Local Storage ───
@@ -196,4 +270,3 @@ class NotificationsNotifier extends Notifier<bool> {
     await storage?.setNotificationsEnabled(state);
   }
 }
-

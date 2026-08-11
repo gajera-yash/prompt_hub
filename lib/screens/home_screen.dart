@@ -24,16 +24,30 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final PageController _pageController = PageController();
-  String _selectedCategory = 'All';
 
-  final List<String> _chipCategories = [
-    'ChatGPT',
-    'Midjourney',
-    'SEO Articles',
-    'React',
-    'YouTube Scripts',
-    'Business Plans'
-  ];
+  List<String> get _chipCategories {
+    final prefs = ref.read(userPreferencesProvider);
+    if (prefs != null && prefs.selectedCategories.isNotEmpty) {
+      // Use user's selected categories as primary chips
+      final userChips = prefs.selectedCategories.take(4).toList();
+      // Add a few popular categories to fill out the row
+      const fallbackChips = ['ChatGPT', 'Midjourney', 'SEO Articles', 'React'];
+      final result = [...userChips];
+      for (final chip in fallbackChips) {
+        if (result.length >= 6) break;
+        if (!result.contains(chip)) result.add(chip);
+      }
+      return result;
+    }
+    return const [
+      'ChatGPT',
+      'Midjourney',
+      'SEO Articles',
+      'React',
+      'YouTube Scripts',
+      'Business Plans'
+    ];
+  }
 
   @override
   void dispose() {
@@ -233,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: SectionHeader(
-                  title: '✨ Just For You',
+                  title: _buildPersonalizedSectionTitle(),
                   onSeeAll: () {},
                 ),
               ),
@@ -257,6 +271,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAppBar() {
+    final prefs = ref.watch(userPreferencesProvider);
+    final subtitle = prefs?.selectedGoal != null
+        ? '${prefs!.selectedGoal} expert'
+        : 'Supercharge your AI';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -286,7 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Supercharge your AI',
+                  subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).brightness == Brightness.dark 
                         ? AppColors.textMuted 
@@ -313,6 +332,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ],
     );
+  }
+
+  String _buildPersonalizedSectionTitle() {
+    final prefs = ref.watch(userPreferencesProvider);
+    if (prefs?.selectedGoal != null) {
+      return '✨ For ${prefs!.selectedGoal}';
+    }
+    return '✨ Just For You';
   }
 
   Widget _buildPromptsList() {

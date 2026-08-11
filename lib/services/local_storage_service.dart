@@ -44,6 +44,33 @@ class LocalStorageService {
   Future<void> saveUserPreferences(UserPreferencesModel prefs) =>
       _prefs.setString('userPreferences', prefs.toJson());
 
+  // ─── Daily Prompt Generation Limit ───
+  static const int dailyFreePromptLimit = 3;
+
+  int getDailyPromptCount() {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = _prefs.getString('promptDate') ?? '';
+    if (savedDate != today) {
+      return 0;
+    }
+    return _prefs.getInt('promptCount') ?? 0;
+  }
+
+  Future<void> incrementDailyPromptCount() async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final savedDate = _prefs.getString('promptDate') ?? '';
+    if (savedDate != today) {
+      await _prefs.setString('promptDate', today);
+      await _prefs.setInt('promptCount', 1);
+    } else {
+      final count = _prefs.getInt('promptCount') ?? 0;
+      await _prefs.setInt('promptCount', count + 1);
+    }
+  }
+
+  bool get hasReachedDailyPromptLimit =>
+      getDailyPromptCount() >= dailyFreePromptLimit;
+
   // ─── Saved Prompts ───
   List<String> getSavedPromptIds() =>
       _prefs.getStringList('savedPrompts') ?? [];

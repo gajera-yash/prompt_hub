@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../core/theme/app_colors.dart';
 import '../services/local_storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -25,9 +24,12 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final storage = await LocalStorageService.getInstance();
       final hasSeen = storage.hasSeenOnboarding();
+      final hasPreferences = storage.getUserPreferences() != null;
 
-      if (!hasSeen) {
-        await storage.setHasSeenOnboarding(true);
+      // Show onboarding if:
+      // 1. User has never seen onboarding, OR
+      // 2. hasSeenOnboarding is true but no preferences were saved (old buggy version set the flag prematurely)
+      if (!hasSeen || !hasPreferences) {
         if (mounted) context.go('/onboarding');
       } else {
         if (mounted) context.go('/home');
