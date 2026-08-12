@@ -7,6 +7,7 @@ import 'core/utils/ad_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/local_storage_service.dart';
 import 'providers/data_providers.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,12 @@ void main() async {
     url: 'https://vtbwsujhciftwdfigppd.supabase.co',
     anonKey: 'sb_publishable_Jf7cYoBjVrkjeT-wyZNpOQ_vPWkdLvf',
   );
+
+  // Initialize notifications
+  await NotificationService.instance.init();
+  NotificationService.instance.onNotificationClick = (String payload) {
+    goRouter.push('/prompt/$payload');
+  };
 
   // Initialize local storage
   final localStorage = await LocalStorageService.getInstance();

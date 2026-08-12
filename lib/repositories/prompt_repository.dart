@@ -6,6 +6,7 @@ import '../models/prompt_model.dart';
 import 'dart:async';
 import 'dart:math';
 import '../data/mock_categories.dart';
+import '../services/local_storage_service.dart' as import_local_storage;
 
 abstract class PromptRepository {
   Future<List<PromptModel>> getFeaturedPrompts();
@@ -115,8 +116,23 @@ class HybridPromptRepository implements PromptRepository {
         copyCount: 432,
       ),
     ]);
+
+    // Load custom generated prompts
+    try {
+      final storage = await import_local_storage.LocalStorageService.getInstance();
+      final customJsonList = storage.getCustomPromptsJson();
+      for (var jsonStr in customJsonList) {
+        _dummyPrompts.add(PromptModel.fromJson(json.decode(jsonStr)));
+      }
+    } catch (e) {
+      debugPrint('Error loading custom prompts: $e');
+    }
     
     _isInitialized = true;
+  }
+
+  void addCustomPromptToMemory(PromptModel prompt) {
+    _dummyPrompts.add(prompt);
   }
 
   List<PromptModel> _generateHighQualityPrompts() {

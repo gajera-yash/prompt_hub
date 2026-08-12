@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_text_styles.dart';
@@ -14,6 +15,7 @@ import '../widgets/section_header.dart';
 import '../widgets/custom_search_bar.dart';
 import '../widgets/feature_banner_card.dart';
 import '../widgets/skeleton_loading.dart';
+import '../services/notification_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +26,27 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final PageController _pageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    _requestNotificationPermission();
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    await NotificationService.instance.requestPermissions();
+    
+    // Also schedule daily prompts once permission might be granted
+    try {
+      final repo = ref.read(promptRepositoryProvider);
+      final allPrompts = await repo.getRecentPrompts();
+      if (allPrompts.isNotEmpty) {
+        await NotificationService.instance.scheduleDailyPrompts(allPrompts);
+      }
+    } catch (e) {
+      debugPrint('Error scheduling daily prompts: $e');
+    }
+  }
 
   List<String> get _chipCategories {
     final prefs = ref.read(userPreferencesProvider);
@@ -317,18 +340,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.border
-                  : AppColors.borderLightTheme,
+        GestureDetector(
+          onTap: () => context.push('/notifications'),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.border
+                    : AppColors.borderLightTheme,
+              ),
             ),
+            child: const Icon(LucideIcons.bell, color: AppColors.primary, size: 20),
           ),
-          child: const Icon(LucideIcons.bell, color: AppColors.primary, size: 20),
         ),
       ],
     );

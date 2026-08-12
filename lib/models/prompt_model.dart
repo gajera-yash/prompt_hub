@@ -48,4 +48,34 @@ class PromptModel {
       imageUrl: imageUrl ?? this.imageUrl,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'content': content,
+      'aiTool': aiTool,
+      'category': category,
+      'difficulty': difficulty,
+      'copyCount': copyCount,
+      'isFavorite': isFavorite,
+      'imageUrl': imageUrl,
+    };
+  }
+
+  factory PromptModel.fromJson(Map<String, dynamic> json) {
+    return PromptModel(
+      id: json['id'],
+      title: json['title'],
+      description: json['description'],
+      content: json['content'],
+      aiTool: json['aiTool'],
+      category: json['category'],
+      difficulty: json['difficulty'] ?? 'Intermediate',
+      copyCount: json['copyCount'] ?? 0,
+      isFavorite: json['isFavorite'] ?? false,
+      imageUrl: json['imageUrl'],
+    );
+  }
 }

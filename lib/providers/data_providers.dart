@@ -74,6 +74,31 @@ final promptByIdProvider = FutureProvider.family<PromptModel?, String>((ref, id)
   return repo.getPromptById(id);
 });
 
+final notificationHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final storage = await LocalStorageService.getInstance();
+  final data = storage.getScheduledNotificationsJson();
+  final repo = ref.watch(promptRepositoryProvider);
+  final List<Map<String, dynamic>> list = [];
+  final now = DateTime.now().millisecondsSinceEpoch;
+
+  for (final item in data) {
+    if (item['time'] <= now) {
+      final p = await repo.getPromptById(item['id']);
+      if (p != null) {
+        list.add({
+          'prompt': p,
+          'time': item['time'],
+        });
+      }
+    }
+  }
+
+  // Sort by most recent first
+  list.sort((a, b) => b['time'].compareTo(a['time']));
+
+  return list;
+});
+
 // ─── User Preferences & Personalization ───
 final userPreferencesProvider = NotifierProvider<UserPreferencesNotifier, UserPreferencesModel?>(
   UserPreferencesNotifier.new,
@@ -268,5 +293,39 @@ class NotificationsNotifier extends Notifier<bool> {
     final storage = ref.read(localStorageProvider);
     state = !state;
     await storage?.setNotificationsEnabled(state);
+  }
+}
+
+// ─── Folders & Collections ───
+final customFoldersProvider = NotifierProvider<CustomFoldersNotifier, List<String>>(
+  CustomFoldersNotifier.new,
+);
+
+class CustomFoldersNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    // Return default folders. In a real app, load from local storage.
+    return ['All', 'Favorites'];
+  }
+
+  void addFolder(String folderName) {
+    if (!state.contains(folderName)) {
+      state = [...state, folderName];
+    }
+  }
+}
+
+final savedPromptFoldersProvider = NotifierProvider<SavedPromptFoldersNotifier, Map<String, String>>(
+  SavedPromptFoldersNotifier.new,
+);
+
+class SavedPromptFoldersNotifier extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() {
+    return {};
+  }
+
+  void setFolder(String promptId, String folderName) {
+    state = {...state, promptId: folderName};
   }
 }

@@ -569,37 +569,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ],
           ),
         ).animate(delay: 400.ms).fade(duration: 500.ms).slideY(begin: 0.2, end: 0),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: _isFinishing ? null : _finishOnboarding,
-            icon: _isFinishing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(LucideIcons.rocket, size: 20),
-            label: Text(
-              _isFinishing ? 'Setting up...' : 'Start Exploring',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ).animate(delay: 500.ms).fade(duration: 500.ms).slideY(begin: 0.2, end: 0),
       ],
     );
   }
@@ -653,7 +622,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ],
                   ),
                 ),
-                if (_currentPage < 5) _buildProgressBar(),
+                Visibility(
+                  visible: _currentPage < 5,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  child: _buildProgressBar(),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Expanded(
                   child: PageView(
@@ -682,11 +657,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ],
                   ),
                 ),
-                if (_currentPage < 5)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      if (_currentPage < 5) ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(5, (index) {
@@ -737,9 +712,42 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             ),
                           ),
                         ),
+                      ] else ...[
+                        const SizedBox(height: 28), // Matches height of dots (8) + spacing (20)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton.icon(
+                            onPressed: _isFinishing ? null : _finishOnboarding,
+                            icon: _isFinishing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(LucideIcons.rocket, size: 20),
+                            label: Text(
+                              _isFinishing ? 'Setting up...' : 'Start Exploring',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),

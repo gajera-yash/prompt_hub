@@ -366,11 +366,27 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
     );
   }
 
-  Widget _buildAIIconButton(BuildContext context, String label, String url, IconData icon, Color color) {
+  Widget _buildAIIconButton(BuildContext context, String label, String baseUrl, IconData icon, Color color) {
     return Expanded(
       child: InkWell(
         onTap: () async {
-          final uri = Uri.parse(url);
+          if (_currentPromptContent.isEmpty) return;
+          
+          // Copy to clipboard for convenience
+          await Clipboard.setData(ClipboardData(text: _currentPromptContent));
+
+          final String encodedPrompt = Uri.encodeComponent(_currentPromptContent);
+          String fullUrl = baseUrl;
+          
+          if (label == 'ChatGPT') {
+            fullUrl = '$baseUrl/?q=$encodedPrompt';
+          } else if (label == 'Claude') {
+            fullUrl = '$baseUrl/new?q=$encodedPrompt';
+          } else if (label == 'Gemini') {
+            fullUrl = '$baseUrl/app?q=$encodedPrompt';
+          }
+          
+          final uri = Uri.parse(fullUrl);
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {

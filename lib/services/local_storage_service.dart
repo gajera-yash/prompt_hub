@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_preferences_model.dart';
 
@@ -91,5 +92,32 @@ class LocalStorageService {
 
   Future<void> clearAllSavedPrompts() async {
     await _prefs.remove('savedPrompts');
+  }
+
+  // ─── Custom Generated Prompts ───
+  List<String> getCustomPromptsJson() =>
+      _prefs.getStringList('customPrompts') ?? [];
+
+  Future<void> saveCustomPromptJson(String promptJson) async {
+    final list = getCustomPromptsJson();
+    list.add(promptJson);
+    await _prefs.setStringList('customPrompts', list);
+  }
+  // ─── Scheduled Notifications History ───
+  List<String> getScheduledNotificationIds() =>
+      _prefs.getStringList('scheduledNotifications') ?? [];
+
+  Future<void> saveScheduledNotificationIds(List<String> ids) async {
+    await _prefs.setStringList('scheduledNotifications', ids);
+  }
+
+  List<Map<String, dynamic>> getScheduledNotificationsJson() {
+    final list = _prefs.getStringList('scheduledNotificationsJson') ?? [];
+    return list.map((e) => json.decode(e) as Map<String, dynamic>).toList();
+  }
+
+  Future<void> saveScheduledNotificationsJson(List<Map<String, dynamic>> notifications) async {
+    final list = notifications.map((e) => json.encode(e)).toList();
+    await _prefs.setStringList('scheduledNotificationsJson', list);
   }
 }

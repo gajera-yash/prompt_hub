@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_text_styles.dart';
@@ -9,18 +11,39 @@ import '../core/utils/ad_helper.dart';
 import '../widgets/gradient_button.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../models/prompt_model.dart';
+import '../services/local_storage_service.dart';
+import '../providers/data_providers.dart';
+import '../repositories/prompt_repository.dart';
 
-class PromptGeneratorScreen extends StatefulWidget {
+class PromptGeneratorScreen extends ConsumerStatefulWidget {
   const PromptGeneratorScreen({super.key});
 
   @override
-  State<PromptGeneratorScreen> createState() => _PromptGeneratorScreenState();
+  ConsumerState<PromptGeneratorScreen> createState() => _PromptGeneratorScreenState();
 }
 
-class _PromptGeneratorScreenState extends State<PromptGeneratorScreen> {
+class _PromptGeneratorScreenState extends ConsumerState<PromptGeneratorScreen> {
   final _inputController = TextEditingController();
   String? _generatedPrompt;
   bool _isGenerating = false;
+  bool _isSaved = false;
+  int _freeCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFreeCount();
+  }
+
+  void _loadFreeCount() async {
+    final storage = await LocalStorageService.getInstance();
+    if (mounted) {
+      setState(() {
+        _freeCount = (LocalStorageService.dailyFreePromptLimit - storage.getDailyPromptCount()).clamp(0, LocalStorageService.dailyFreePromptLimit);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -37,19 +60,35 @@ class _PromptGeneratorScreenState extends State<PromptGeneratorScreen> {
       return;
     }
 
-    AdHelper.showRewardedAd(
-      onUserEarnedReward: (reward) {},
-      onAdDismissed: () async {
-        setState(() {
-          _isGenerating = true;
-          _generatedPrompt = null;
-        });
+    final storage = await LocalStorageService.getInstance();
+    final currentFreeCount = (LocalStorageService.dailyFreePromptLimit - storage.getDailyPromptCount()).clamp(0, LocalStorageService.dailyFreePromptLimit);
 
-        // Simulate API delay for a premium AI generation feel
-        await Future.delayed(const Duration(milliseconds: 2000));
+    if (currentFreeCount > 0) {
+      await storage.incrementDailyPromptCount();
+      _loadFreeCount();
+      _executeGeneration(input);
+    } else {
+      AdHelper.showRewardedAd(
+        onUserEarnedReward: (reward) {},
+        onAdDismissed: () {
+          _executeGeneration(input);
+        },
+      );
+    }
+  }
 
-        // Generate a high quality detailed prompt structure based on user input
-        String generated = '''Act as an absolute expert in the relevant field. 
+  void _executeGeneration(String input) async {
+    setState(() {
+      _isGenerating = true;
+      _generatedPrompt = null;
+      _isSaved = false;
+    });
+
+    // Simulate API delay for a premium AI generation feel
+    await Future.delayed(const Duration(milliseconds: 2000));
+
+    // Generate a high quality detailed prompt structure based on user input
+    String generated = '''Act as an absolute expert in the relevant field. 
 
 **Task:**
 I need you to create a comprehensive, high-quality response based on the following core requirement: "$input".
@@ -70,14 +109,13 @@ I need you to create a comprehensive, high-quality response based on the followi
 
 Please begin your response now by acknowledging this role and delivering the requested content.''';
 
-        if (mounted) {
-          setState(() {
-            _generatedPrompt = generated;
-            _isGenerating = false;
-          });
-        }
-      },
-    );
+    if (mounted) {
+      setState(() {
+        _generatedPrompt = generated;
+        _isGenerating = false;
+      });
+      _saveToFavorites();
+    }
   }
 
   void _copyToClipboard() {
@@ -95,6 +133,50 @@ Please begin your response now by acknowledging this role and delivering the req
             );
           }
         },
+      );
+    }
+  }
+
+  void _saveToFavorites() async {
+    if (_generatedPrompt == null || _isSaved) return;
+
+    final titlePrefix = _inputController.text.trim();
+    final title = 'Custom Prompt - ${titlePrefix.length > 20 ? '${titlePrefix.substring(0, 20)}...' : titlePrefix}';
+    final id = 'gen_${DateTime.now().millisecondsSinceEpoch}';
+
+    final prompt = PromptModel(
+      id: id,
+      title: title,
+      description: 'Custom AI Generated Prompt',
+      content: _generatedPrompt!,
+      aiTool: 'Custom',
+      category: 'Custom',
+      isFavorite: true,
+    );
+
+    // Save to LocalStorage custom prompts
+    final storage = await LocalStorageService.getInstance();
+    await storage.saveCustomPromptJson(jsonEncode(prompt.toJson()));
+    
+    // Add to HybridPromptRepository
+    final repo = ref.read(promptRepositoryProvider) as HybridPromptRepository;
+    repo.addCustomPromptToMemory(prompt);
+    
+    // Add ID to SavedPromptsNotifier
+    final savedNotifier = ref.read(savedPromptsProvider.notifier);
+    if (!savedNotifier.isSaved(prompt.id)) {
+      await savedNotifier.toggleSave(prompt.id);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSaved = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Prompt saved to favorites!'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -220,7 +302,7 @@ Please begin your response now by acknowledging this role and delivering the req
                 width: double.infinity,
                 child: GradientButton(
                   onPressed: _isGenerating ? () {} : _generatePrompt,
-                  text: _isGenerating ? 'Architecting Prompt...' : 'Generate High-Quality Prompt',
+                  text: _isGenerating ? 'Architecting Prompt...' : 'Generate High-Quality Prompt ($_freeCount)',
                   icon: _isGenerating ? LucideIcons.loader : LucideIcons.wand2,
                 ),
               ),
@@ -238,10 +320,24 @@ Please begin your response now by acknowledging this role and delivering the req
                       'Your Optimized Prompt',
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    TextButton.icon(
-                      onPressed: _copyToClipboard,
-                      icon: const Icon(LucideIcons.copy, size: 18),
-                      label: const Text('Copy'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: _isSaved ? null : _saveToFavorites,
+                          icon: Icon(
+                            _isSaved ? LucideIcons.checkCircle : LucideIcons.heart,
+                            size: 20,
+                            color: _isSaved ? AppColors.primary : null,
+                          ),
+                          tooltip: _isSaved ? 'Saved' : 'Save to Favorites',
+                        ),
+                        TextButton.icon(
+                          onPressed: _copyToClipboard,
+                          icon: const Icon(LucideIcons.copy, size: 18),
+                          label: const Text('Copy'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -310,11 +406,27 @@ Please begin your response now by acknowledging this role and delivering the req
     );
   }
 
-  Widget _buildAIIconButton(BuildContext context, String label, String url, IconData icon, Color color) {
+  Widget _buildAIIconButton(BuildContext context, String label, String baseUrl, IconData icon, Color color) {
     return Expanded(
       child: InkWell(
         onTap: () async {
-          final uri = Uri.parse(url);
+          if (_generatedPrompt == null) return;
+          
+          // Copy to clipboard for convenience
+          await Clipboard.setData(ClipboardData(text: _generatedPrompt!));
+
+          final String encodedPrompt = Uri.encodeComponent(_generatedPrompt!);
+          String fullUrl = baseUrl;
+          
+          if (label == 'ChatGPT') {
+            fullUrl = '$baseUrl/?q=$encodedPrompt';
+          } else if (label == 'Claude') {
+            fullUrl = '$baseUrl/new?q=$encodedPrompt';
+          } else if (label == 'Gemini') {
+            fullUrl = '$baseUrl/app?q=$encodedPrompt';
+          }
+          
+          final uri = Uri.parse(fullUrl);
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {

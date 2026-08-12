@@ -23,6 +23,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
     try {
       final storage = await LocalStorageService.getInstance();
+      
+      // FOR TESTING: Reset onboarding status so it shows every time
+      await storage.setHasSeenOnboarding(false);
+      
       final hasSeen = storage.hasSeenOnboarding();
       final hasPreferences = storage.getUserPreferences() != null;
 
