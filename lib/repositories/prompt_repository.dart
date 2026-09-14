@@ -37,6 +37,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1601042879364-f3947d3f9c16?q=80&w=600&auto=format&fit=crop',
       copyCount: 1205,
+      isPremium: true,
     ),
     PromptModel(
       id: 'photo_2',
@@ -47,6 +48,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=600&auto=format&fit=crop',
       copyCount: 850,
+      isPremium: false,
     ),
     PromptModel(
       id: 'photo_3',
@@ -57,6 +59,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=600&auto=format&fit=crop',
       copyCount: 2340,
+      isPremium: true,
     ),
     PromptModel(
       id: 'photo_4',
@@ -67,6 +70,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=600&auto=format&fit=crop',
       copyCount: 432,
+      isPremium: false,
     ),
     PromptModel(
       id: 'photo_5',
@@ -77,6 +81,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop',
       copyCount: 3100,
+      isPremium: true,
     ),
     PromptModel(
       id: 'photo_6',
@@ -87,6 +92,7 @@ class HybridPromptRepository implements PromptRepository {
       category: 'Image Generation',
       imageUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=600&auto=format&fit=crop',
       copyCount: 1950,
+      isPremium: false,
     ),
   ];
 
@@ -106,11 +112,23 @@ class HybridPromptRepository implements PromptRepository {
 
   Future<void> _fetchRemotePrompts() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('prompts').orderBy('createdAt', descending: true).get();
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      try {
+        snapshot = await FirebaseFirestore.instance
+            .collection('prompts')
+            .orderBy('createdAt', descending: true)
+            .get();
+      } catch (_) {
+        snapshot = await FirebaseFirestore.instance.collection('prompts').get();
+      }
       
       List<PromptModel> remotePrompts = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
+        final isPrem = data['isPremium'] == true ||
+            data['isPro'] == true ||
+            data['difficulty']?.toString().toLowerCase() == 'advanced';
+
         remotePrompts.add(PromptModel(
           id: doc.id,
           title: data['title']?.toString() ?? 'Untitled',
@@ -120,6 +138,7 @@ class HybridPromptRepository implements PromptRepository {
           category: data['subcategory']?.toString() ?? data['category']?.toString() ?? 'General',
           copyCount: (data['copyCount'] as num?)?.toInt() ?? 0,
           imageUrl: data['imageUrl']?.toString(), // Parse image_url if exists
+          isPremium: isPrem,
         ));
       }
       _remotePrompts = remotePrompts;
@@ -321,17 +340,20 @@ class HybridPromptRepository implements PromptRepository {
       // 1. Add specific hardcoded prompts if available
       if (hardcodedData.containsKey(category)) {
         for (var data in hardcodedData[category]!) {
+          final diff = ['Beginner', 'Intermediate', 'Advanced'][random.nextInt(3)];
+          final isPrem = diff == 'Advanced' || (idCounter % 4 == 0);
           generated.add(
             PromptModel(
               id: idCounter.toString(),
               title: data['title']!,
-              description: 'A premium, handcrafted prompt specifically designed for ${category}.',
+              description: 'A premium, handcrafted prompt specifically designed for $category.',
               content: data['content']!,
               aiTool: ['Midjourney', 'DALL·E', 'Flux AI', 'Leonardo AI', 'Stable Diffusion'].contains(category) ? 'Midjourney' : 'ChatGPT',
               category: category,
-              difficulty: ['Beginner', 'Intermediate', 'Advanced'][random.nextInt(3)],
+              difficulty: diff,
               copyCount: random.nextInt(50000) + 1000,
               isFavorite: false,
+              isPremium: isPrem,
             ),
           );
           idCounter++;
@@ -350,17 +372,21 @@ class HybridPromptRepository implements PromptRepository {
           title = '$title (Variant ${i - universalTemplates.length + 1})';
         }
 
+        final diff = ['Beginner', 'Intermediate', 'Advanced'][random.nextInt(3)];
+        final isPrem = diff == 'Advanced' || (idCounter % 4 == 0);
+
         generated.add(
           PromptModel(
             id: idCounter.toString(),
             title: title,
-            description: 'A highly optimized, template-based prompt engineered for ${category} tasks.',
+            description: 'A highly optimized, template-based prompt engineered for $category tasks.',
             content: content,
             aiTool: 'ChatGPT',
             category: category,
-            difficulty: ['Beginner', 'Intermediate', 'Advanced'][random.nextInt(3)],
+            difficulty: diff,
             copyCount: random.nextInt(20000) + 500,
             isFavorite: false,
+            isPremium: isPrem,
           ),
         );
         idCounter++;

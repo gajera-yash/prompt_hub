@@ -12,6 +12,7 @@ import '../providers/data_providers.dart';
 import '../core/utils/ad_helper.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/prompt_card.dart';
+import '../services/review_service.dart';
 
 class PromptDetailScreen extends ConsumerStatefulWidget {
   final String promptId;
@@ -23,7 +24,41 @@ class PromptDetailScreen extends ConsumerStatefulWidget {
 
 class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
   final Map<String, TextEditingController> _variableControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ReviewService.instance.recordActionAndCheckReview(context, triggerThreshold: 3);
+    });
+  }
   String _currentPromptContent = '';
+
+  void _handleUnlockWithRewardedAd(String promptId) {
+    AdHelper.loadRewardedAd();
+    AdHelper.showRewardedAd(
+      onUserEarnedReward: (reward) async {
+        await ref.read(unlockedPromptsProvider.notifier).unlockPrompt(promptId);
+        HapticFeedback.mediumImpact();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppColors.accentGreen),
+                  SizedBox(width: 10),
+                  Text('PRO Prompt Unlocked! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              backgroundColor: AppColors.surface,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      },
+    );
+  }
 
   List<String> _extractVariables(String text) {
     final RegExp regExp = RegExp(r'\[(.*?)\]');
@@ -113,6 +148,8 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
       bottomNavigationBar: promptAsync.when(
         data: (prompt) {
           if (prompt == null) return const SizedBox.shrink();
+          final isUnlocked = !prompt.isPremium || ref.watch(unlockedPromptsProvider).contains(prompt.id);
+
           return Container(
             padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
@@ -136,29 +173,74 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                 ),
               ],
             ),
-            child: GradientButton(
-              text: 'Copy Prompt',
-              icon: LucideIcons.copy,
-              onPressed: () {
-                AdHelper.showRewardedAd(
-                  onUserEarnedReward: (reward) {},
-                  onAdDismissed: () {
-                    Clipboard.setData(ClipboardData(text: _currentPromptContent));
-                    HapticFeedback.selectionClick();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Prompt copied to clipboard!'),
-                          backgroundColor: AppColors.surface,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+            child: isUnlocked
+                ? GradientButton(
+                    text: 'Copy Prompt',
+                    icon: LucideIcons.copy,
+                    onPressed: () {
+                      AdHelper.showSmartInterstitialAd(
+                        onAdDismissed: () {
+                          Clipboard.setData(ClipboardData(text: _currentPromptContent));
+                          HapticFeedback.selectionClick();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Prompt copied to clipboard!'),
+                                backgroundColor: AppColors.surface,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            );
+                            ReviewService.instance.recordActionAndCheckReview(context, triggerThreshold: 3);
+                          }
+                        },
                       );
-                    }
-                  },
-                );
-              },
-            ),
+                    },
+                  )
+                : SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFB800), Color(0xFFFF8A00)],
+                        ),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFB800).withValues(alpha: 0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () => _handleUnlockWithRewardedAd(prompt.id),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Watch Video to Unlock Prompt 👑',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
           );
         },
         loading: () => const SizedBox.shrink(),
@@ -169,6 +251,8 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
           if (prompt == null) {
             return Center(child: Text('Prompt not found.', style: AppTextStyles.bodyLarge));
           }
+
+          final isUnlocked = !prompt.isPremium || ref.watch(unlockedPromptsProvider).contains(prompt.id);
 
           if (_variableControllers.isEmpty) {
             _currentPromptContent = prompt.content;
@@ -253,6 +337,13 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: Row(
                     children: [
+                      if (prompt.isPremium) ...[
+                        _buildTag(
+                          isUnlocked ? '👑 PRO UNLOCKED' : '👑 PRO',
+                          const Color(0xFFFFB800),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
                       _buildTag(prompt.category, AppColors.secondary),
                       const SizedBox(width: AppSpacing.sm),
                       _buildTag(prompt.aiTool, AppColors.accent),
@@ -262,10 +353,62 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                   ),
                 ),
 
+                if (prompt.isPremium && !isUnlocked) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFFFB800).withValues(alpha: 0.15),
+                          const Color(0xFFFF8A00).withValues(alpha: 0.15),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(
+                        color: const Color(0xFFFFB800).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: Color(0xFFFFB800),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Exclusive PRO Prompt',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFFFB800),
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                'Watch a short video ad to unlock full prompt & customization.',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: AppSpacing.xl),
 
-                // Variables Section
-                if (_variableControllers.isNotEmpty) ...[
+                // Variables Section (Available when unlocked)
+                if (isUnlocked && _variableControllers.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     child: Text('🔧 Fill Variables', style: AppTextStyles.h4),
@@ -309,26 +452,139 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                 // Prompt Text
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: Text('📋 Prompt', style: AppTextStyles.h4),
+                  child: Row(
+                    children: [
+                      Text('📋 Prompt', style: AppTextStyles.h4),
+                      const Spacer(),
+                      if (prompt.isPremium)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB800), Color(0xFFFF8A00)],
+                            ),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isUnlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isUnlocked ? 'UNLOCKED' : 'LOCKED',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.border),
+                if (isUnlocked)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: SelectableText(
+                      _currentPromptContent,
+                      style: AppTextStyles.monospace,
+                    ),
+                  )
+                else
+                  // Locked Prompt Preview Card
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(
+                        color: const Color(0xFFFFB800).withValues(alpha: 0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB800).withValues(alpha: 0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          _currentPromptContent.length > 90
+                              ? '${_currentPromptContent.substring(0, 90)}...\n\n[PRO Content Hidden - Watch short ad to reveal]'
+                              : _currentPromptContent,
+                          style: AppTextStyles.monospace.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFFFB800).withValues(alpha: 0.15),
+                          ),
+                          child: const Icon(
+                            Icons.lock_rounded,
+                            color: Color(0xFFFFB800),
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        const Text(
+                          'PRO Prompt Locked 👑',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFFB800),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Watch a quick video ad to unlock the complete prompt.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        OutlinedButton.icon(
+                          onPressed: () => _handleUnlockWithRewardedAd(prompt.id),
+                          icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
+                          label: const Text('Watch Video to Unlock'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFFB800),
+                            side: const BorderSide(color: Color(0xFFFFB800)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: SelectableText(
-                    _currentPromptContent,
-                    style: AppTextStyles.monospace,
-                  ),
-                ),
 
                 const SizedBox(height: AppSpacing.xl),
-
 
                 // Actions: AI Direct Launch Section
                 Padding(
@@ -360,9 +616,33 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
                         const SizedBox(height: AppSpacing.md),
                         Row(
                           children: [
-                            _buildAIIconButton(context, 'ChatGPT', 'https://chatgpt.com', LucideIcons.messageSquare, const Color(0xFF10A37F)),
-                            _buildAIIconButton(context, 'Claude', 'https://claude.ai', LucideIcons.cpu, const Color(0xFFD97757)),
-                            _buildAIIconButton(context, 'Gemini', 'https://gemini.google.com', LucideIcons.sparkles, const Color(0xFF1A73E8)),
+                            _buildAIIconButton(
+                              context,
+                              'ChatGPT',
+                              'https://chatgpt.com',
+                              LucideIcons.messageSquare,
+                              const Color(0xFF10A37F),
+                              isUnlocked: isUnlocked,
+                              onLockedTap: () => _handleUnlockWithRewardedAd(prompt.id),
+                            ),
+                            _buildAIIconButton(
+                              context,
+                              'Claude',
+                              'https://claude.ai',
+                              LucideIcons.cpu,
+                              const Color(0xFFD97757),
+                              isUnlocked: isUnlocked,
+                              onLockedTap: () => _handleUnlockWithRewardedAd(prompt.id),
+                            ),
+                            _buildAIIconButton(
+                              context,
+                              'Gemini',
+                              'https://gemini.google.com',
+                              LucideIcons.sparkles,
+                              const Color(0xFF1A73E8),
+                              isUnlocked: isUnlocked,
+                              onLockedTap: () => _handleUnlockWithRewardedAd(prompt.id),
+                            ),
                           ],
                         ),
                       ],
@@ -391,10 +671,22 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
     );
   }
 
-  Widget _buildAIIconButton(BuildContext context, String label, String baseUrl, IconData icon, Color color) {
+  Widget _buildAIIconButton(
+    BuildContext context,
+    String label,
+    String baseUrl,
+    IconData icon,
+    Color color, {
+    bool isUnlocked = true,
+    VoidCallback? onLockedTap,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: () async {
+          if (!isUnlocked) {
+            onLockedTap?.call();
+            return;
+          }
           if (_currentPromptContent.isEmpty) return;
           
           // Copy to clipboard for convenience

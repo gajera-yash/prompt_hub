@@ -136,6 +136,26 @@ class AdHelper {
     _interstitialAd = null;
   }
 
+  static int _interstitialCounter = 0;
+
+  /// Shows interstitial ad only every [frequency] calls to prevent spamming
+  static void showSmartInterstitialAd({void Function()? onAdDismissed, int frequency = 3}) {
+    _interstitialCounter++;
+    if (_interstitialCounter % frequency == 0) {
+      showInterstitialAd(onAdDismissed: onAdDismissed);
+    } else {
+      onAdDismissed?.call();
+    }
+  }
+
+  static bool get isRewardedAdLoaded => _rewardedAd != null;
+
+  static void loadRewardedAd() {
+    if (_rewardedAd == null) {
+      _createRewardedAd();
+    }
+  }
+
   static void _createRewardedAd() {
     RewardedAd.load(
         adUnitId: rewardedAdUnitId,
@@ -144,6 +164,7 @@ class AdHelper {
           onAdLoaded: (RewardedAd ad) {
             _rewardedAd = ad;
             _numRewardedLoadAttempts = 0;
+            _rewardedAd!.setImmersiveMode(true);
           },
           onAdFailedToLoad: (LoadAdError error) {
             _numRewardedLoadAttempts += 1;
@@ -155,25 +176,42 @@ class AdHelper {
         ));
   }
 
-  static void showRewardedAd({required void Function(RewardItem) onUserEarnedReward, void Function()? onAdDismissed}) {
-    if (!showAds || _rewardedAd == null) {
-      // If ad isn't ready or disabled, just give the reward immediately to not block UX, or show error.
-      onUserEarnedReward(RewardItem(10, 'coins'));
+  static void showRewardedAd({
+    required void Function(RewardItem) onUserEarnedReward,
+    void Function()? onAdDismissed,
+  }) {
+    if (!showAds) {
+      onUserEarnedReward(RewardItem(1, 'prompt_unlock'));
       onAdDismissed?.call();
       return;
     }
+
+    if (_rewardedAd == null) {
+      // Reload for next time
+      _createRewardedAd();
+      // Grant reward to prevent locking user out if network failed
+      onUserEarnedReward(RewardItem(1, 'prompt_unlock'));
+      onAdDismissed?.call();
+      return;
+    }
+
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (RewardedAd ad) {
         ad.dispose();
-        _createRewardedAd();
+        _rewardedAd = null;
+        _createRewardedAd(); // Preload next rewarded ad immediately
         onAdDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
         ad.dispose();
+        _rewardedAd = null;
         _createRewardedAd();
+        // Give reward if ad failed to show so user isn't stuck
+        onUserEarnedReward(RewardItem(1, 'prompt_unlock'));
         onAdDismissed?.call();
       },
     );
+
     _rewardedAd!.show(onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
       onUserEarnedReward(reward);
     });

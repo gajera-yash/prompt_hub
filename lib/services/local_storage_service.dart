@@ -131,4 +131,30 @@ class LocalStorageService {
     final count = getAppOpenCount();
     await _prefs.setInt('appOpenCount', count + 1);
   }
+
+  /// Click / Action tracking for Review Dialog
+  int getReviewActionCount() => _prefs.getInt('reviewActionCount') ?? 0;
+  Future<void> incrementReviewActionCount() async {
+    final count = getReviewActionCount();
+    await _prefs.setInt('reviewActionCount', count + 1);
+  }
+  Future<void> resetReviewActionCount() => _prefs.setInt('reviewActionCount', 0);
+
+  bool hasRatedApp() => _prefs.getBool('hasRatedApp') ?? false;
+  Future<void> setHasRatedApp(bool value) => _prefs.setBool('hasRatedApp', value);
+
+  // ─── Unlocked Prompts (Rewarded Ads) ───
+  List<String> getUnlockedPromptIds() =>
+      _prefs.getStringList('unlockedPrompts') ?? [];
+
+  bool isPromptUnlocked(String id) =>
+      getUnlockedPromptIds().contains(id);
+
+  Future<void> unlockPromptId(String id) async {
+    final list = getUnlockedPromptIds();
+    if (!list.contains(id)) {
+      list.add(id);
+      await _prefs.setStringList('unlockedPrompts', list);
+    }
+  }
 }

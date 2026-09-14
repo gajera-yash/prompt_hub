@@ -338,6 +338,27 @@ class SavedPromptsNotifier extends Notifier<Set<String>> {
   }
 }
 
+// ─── Unlocked Prompts (via Rewarded Ads) ───
+final unlockedPromptsProvider = NotifierProvider<UnlockedPromptsNotifier, Set<String>>(
+  UnlockedPromptsNotifier.new,
+);
+
+class UnlockedPromptsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    final storage = ref.watch(localStorageProvider);
+    return (storage?.getUnlockedPromptIds() ?? []).toSet();
+  }
+
+  bool isUnlocked(String id) => state.contains(id);
+
+  Future<void> unlockPrompt(String id) async {
+    final storage = ref.read(localStorageProvider);
+    await storage?.unlockPromptId(id);
+    state = Set<String>.from(state)..add(id);
+  }
+}
+
 // ─── Theme Mode ───
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,

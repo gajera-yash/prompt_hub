@@ -9,6 +9,7 @@ class PromptModel {
   final int copyCount;
   final bool isFavorite;
   final String? imageUrl; // Added for Trending Photos
+  final bool isPremium; // Premium / VIP prompt requiring Rewarded Ad unlock
 
   PromptModel({
     required this.id,
@@ -21,6 +22,7 @@ class PromptModel {
     this.copyCount = 0,
     this.isFavorite = false,
     this.imageUrl,
+    this.isPremium = false,
   });
 
   PromptModel copyWith({
@@ -34,6 +36,7 @@ class PromptModel {
     int? copyCount,
     bool? isFavorite,
     String? imageUrl,
+    bool? isPremium,
   }) {
     return PromptModel(
       id: id ?? this.id,
@@ -46,6 +49,7 @@ class PromptModel {
       copyCount: copyCount ?? this.copyCount,
       isFavorite: isFavorite ?? this.isFavorite,
       imageUrl: imageUrl ?? this.imageUrl,
+      isPremium: isPremium ?? this.isPremium,
     );
   }
 
@@ -61,6 +65,7 @@ class PromptModel {
       'copyCount': copyCount,
       'isFavorite': isFavorite,
       'imageUrl': imageUrl,
+      'isPremium': isPremium,
     };
   }
 
@@ -76,6 +81,7 @@ class PromptModel {
       copyCount: json['copyCount'] ?? 0,
       isFavorite: json['isFavorite'] ?? false,
       imageUrl: json['imageUrl'],
+      isPremium: json['isPremium'] == true || json['isPro'] == true,
     );
   }
 }

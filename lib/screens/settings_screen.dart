@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:in_app_update/in_app_update.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/data_providers.dart';
+import '../widgets/review_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -88,13 +89,8 @@ class SettingsScreen extends ConsumerWidget {
             () => _handleCheckForUpdate(context),
             subtitle: 'v1.2.0 (Check for updates)',
           ),
-          _buildListTile(context, LucideIcons.star, 'Rate App', () async {
-            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.ai_prompt_hub.setuvio&hl=en');
-            try {
-              await launchUrl(url, mode: LaunchMode.externalApplication);
-            } catch (e) {
-              debugPrint('Could not launch $url');
-            }
+          _buildListTile(context, LucideIcons.star, 'Rate App', () {
+            ReviewDialog.show(context);
           }),
         ],
       ),
