@@ -15,6 +15,10 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return HybridCategoryRepository();
 });
 
+final promptUpdateStreamProvider = StreamProvider<void>((ref) {
+  return ref.watch(promptRepositoryProvider).onUpdate;
+});
+
 // ─── Global App State ───
 final bottomNavIndexProvider = NotifierProvider<BottomNavIndexNotifier, int>(
   BottomNavIndexNotifier.new,
@@ -30,46 +34,128 @@ class BottomNavIndexNotifier extends Notifier<int> {
 }
 
 final featuredPromptsProvider = FutureProvider<List<PromptModel>>((ref) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getFeaturedPrompts();
 });
 
 final trendingPromptsProvider = FutureProvider<List<PromptModel>>((ref) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getTrendingPrompts();
 });
 
-final trendingPhotosProvider = FutureProvider<List<PromptModel>>((ref) async {
-  final repo = ref.watch(promptRepositoryProvider);
-  return repo.getTrendingPhotos();
-});
+final trendingPhotosProvider =
+    NotifierProvider<TrendingPhotosNotifier, List<PromptModel>>(
+  TrendingPhotosNotifier.new,
+);
+
+class TrendingPhotosNotifier extends Notifier<List<PromptModel>> {
+  @override
+  List<PromptModel> build() {
+    ref.keepAlive();
+    final repo = ref.watch(promptRepositoryProvider) as HybridPromptRepository;
+    
+    // 1. Immediately return local static photos (instant 0ms, no loading)
+    final localPhotos = repo.getLocalTrendingPhotos();
+
+    // 2. Background sync with Firestore
+    _syncRemote(repo);
+
+    return localPhotos;
+  }
+
+  Future<void> refresh() async {
+    final repo = ref.read(promptRepositoryProvider) as HybridPromptRepository;
+    await _syncRemote(repo);
+  }
+
+  Future<void> _syncRemote(HybridPromptRepository repo) async {
+    try {
+      final remotePhotos = await repo.getTrendingPhotos();
+      if (remotePhotos.isNotEmpty) {
+        state = remotePhotos;
+      }
+    } catch (e) {
+      debugPrint('Error syncing trending photos: $e');
+    }
+  }
+}
 
 final recentPromptsProvider = FutureProvider<List<PromptModel>>((ref) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getRecentPrompts();
 });
 
 final dailyPromptProvider = FutureProvider<PromptModel>((ref) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getDailyPrompt();
 });
 
-final categoriesProvider = FutureProvider<List<CategoryModel>>((ref) async {
-  final repo = ref.watch(categoryRepositoryProvider);
-  return repo.getCategories();
-});
+// ─── Categories: instant synchronous local data, silent background Firestore update ───
+final categoriesProvider =
+    NotifierProvider<CategoriesNotifier, List<CategoryModel>>(
+  CategoriesNotifier.new,
+);
+
+class CategoriesNotifier extends Notifier<List<CategoryModel>> {
+  @override
+  List<CategoryModel> build() {
+    ref.keepAlive();
+
+    final categoryRepo = ref.watch(categoryRepositoryProvider) as HybridCategoryRepository;
+    final promptRepo = ref.watch(promptRepositoryProvider);
+
+    // 1. Immediately return local static categories (instant 0ms, NEVER loads)
+    final localCats = categoryRepo.getLocalCategories();
+
+    // 2. Background fetch & sync with Firestore
+    _syncRemote(categoryRepo, promptRepo);
+
+    return localCats;
+  }
+
+  Future<void> refresh() async {
+    final categoryRepo = ref.read(categoryRepositoryProvider) as HybridCategoryRepository;
+    final promptRepo = ref.read(promptRepositoryProvider);
+    categoryRepo.clearCache();
+    await _syncRemote(categoryRepo, promptRepo);
+  }
+
+  Future<void> _syncRemote(HybridCategoryRepository categoryRepo, PromptRepository promptRepo) async {
+    try {
+      final remoteMerged = await categoryRepo.getCategories();
+      final updated = await Future.wait(
+        remoteMerged.map((cat) async {
+          final actualCount = await promptRepo.getCountByCategory(cat.name);
+          final finalCount =
+              actualCount > cat.promptCount ? actualCount : cat.promptCount;
+          return cat.copyWith(promptCount: finalCount);
+        }),
+      );
+      state = updated;
+    } catch (e) {
+      debugPrint('Error syncing remote categories: $e');
+    }
+  }
+}
 
 final searchPromptsProvider = FutureProvider.family<List<PromptModel>, String>((ref, query) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.searchPrompts(query);
 });
 
 final categoryPromptsProvider = FutureProvider.family<List<PromptModel>, String>((ref, category) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getPromptsByCategory(category);
 });
 
 final promptByIdProvider = FutureProvider.family<PromptModel?, String>((ref, id) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   return repo.getPromptById(id);
 });
@@ -119,6 +205,7 @@ class UserPreferencesNotifier extends Notifier<UserPreferencesModel?> {
 }
 
 final personalizedPromptsProvider = FutureProvider<List<PromptModel>>((ref) async {
+  ref.watch(promptUpdateStreamProvider);
   final repo = ref.watch(promptRepositoryProvider);
   final allPrompts = await repo.getRecentPrompts();
   final prefs = ref.watch(userPreferencesProvider);

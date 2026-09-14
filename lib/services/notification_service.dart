@@ -175,4 +175,72 @@ class NotificationService {
       debugPrint('Error saving notifications json: $e');
     }
   }
+  Future<void> scheduleDailyTrendingPhotos(List<PromptModel> trendingPhotos) async {
+    if (trendingPhotos.isEmpty) return;
+
+    final random = Random();
+
+    // Photo notification times - different from prompt times to spread throughout the day
+    final photoTimes = [
+      const Time(9, 0, 0),  // 9:00 AM
+      const Time(13, 0, 0), // 1:00 PM
+      const Time(17, 0, 0), // 5:00 PM
+      const Time(21, 0, 0), // 9:00 PM
+    ];
+
+    final photoMessages = [
+      '🎨 Create stunning AI art today!',
+      '🖼️ Turn your imagination into reality',
+      '✨ New trending photo prompts await you',
+      '🌟 Create beautiful AI images tonight',
+    ];
+
+    final now = tz.TZDateTime.now(tz.local);
+
+    // Use IDs starting at 100 to avoid conflict with prompt notifications (0-5)
+    for (int i = 0; i < photoTimes.length; i++) {
+      final time = photoTimes[i];
+      final photo = trendingPhotos[random.nextInt(trendingPhotos.length)];
+
+      var scheduledDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        time.hour,
+        time.minute,
+      );
+
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: 100 + i,
+        title: photoMessages[i],
+        body: '📸 "${photo.title}" — Tap to see the prompt & recreate it!',
+        scheduledDate: scheduledDate,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'trending_photos_channel',
+            'Trending Photo Prompts',
+            channelDescription: 'Daily trending AI image prompt notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+            styleInformation: BigTextStyleInformation(''),
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            presentBanner: true,
+            presentList: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: photo.id,
+      );
+    }
+  }
 }

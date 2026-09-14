@@ -1,9 +1,19 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdHelper {
+  static bool showAds = true;
+  static String? _dynamicBannerAdUnitId;
+  static String? _dynamicInterstitialAdUnitId;
+  static String? _dynamicRewardedAdUnitId;
+  static String? _dynamicAppOpenAdUnitId;
+
   static String get bannerAdUnitId {
+    if (_dynamicBannerAdUnitId != null && _dynamicBannerAdUnitId!.isNotEmpty) {
+      return _dynamicBannerAdUnitId!;
+    }
     if (Platform.isAndroid) {
       return 'ca-app-pub-8488137796617875/2267233930'; // Production ID
     } else if (Platform.isIOS) {
@@ -13,6 +23,9 @@ class AdHelper {
   }
 
   static String get interstitialAdUnitId {
+    if (_dynamicInterstitialAdUnitId != null && _dynamicInterstitialAdUnitId!.isNotEmpty) {
+      return _dynamicInterstitialAdUnitId!;
+    }
     if (Platform.isAndroid) {
       return 'ca-app-pub-8488137796617875/6179247142'; // Production ID
     } else if (Platform.isIOS) {
@@ -22,6 +35,9 @@ class AdHelper {
   }
 
   static String get rewardedAdUnitId {
+    if (_dynamicRewardedAdUnitId != null && _dynamicRewardedAdUnitId!.isNotEmpty) {
+      return _dynamicRewardedAdUnitId!;
+    }
     if (Platform.isAndroid) {
       return 'ca-app-pub-8488137796617875/9926920462'; // Production ID
     } else if (Platform.isIOS) {
@@ -31,6 +47,9 @@ class AdHelper {
   }
 
   static String get appOpenAdUnitId {
+    if (_dynamicAppOpenAdUnitId != null && _dynamicAppOpenAdUnitId!.isNotEmpty) {
+      return _dynamicAppOpenAdUnitId!;
+    }
     if (Platform.isAndroid) {
       return 'ca-app-pub-8488137796617875/6747203291'; // Production ID
     } else if (Platform.isIOS) {
@@ -52,9 +71,28 @@ class AdHelper {
 
   static Future<void> initialize() async {
     await MobileAds.instance.initialize();
-    _createInterstitialAd();
-    _createRewardedAd();
-    loadAppOpenAd();
+    
+    try {
+      final docSnapshot = await FirebaseFirestore.instance.collection('settings').doc('appSettings').get();
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data()!;
+        print('--- AD SETTINGS FROM FIREBASE ---');
+        print(data);
+        showAds = data['showAds'] ?? true;
+        _dynamicBannerAdUnitId = data['bannerAdUnitId'];
+        _dynamicInterstitialAdUnitId = data['interstitialAdUnitId'];
+        _dynamicRewardedAdUnitId = data['rewardedAdUnitId'];
+        _dynamicAppOpenAdUnitId = data['appOpenAdUnitId'];
+      }
+    } catch (e) {
+      debugPrint('Error fetching ad settings: $e');
+    }
+
+    if (showAds) {
+      _createInterstitialAd();
+      _createRewardedAd();
+      loadAppOpenAd();
+    }
   }
 
   static void _createInterstitialAd() {
@@ -78,7 +116,7 @@ class AdHelper {
   }
 
   static void showInterstitialAd({void Function()? onAdDismissed}) {
-    if (_interstitialAd == null) {
+    if (!showAds || _interstitialAd == null) {
       onAdDismissed?.call();
       return;
     }
@@ -118,8 +156,8 @@ class AdHelper {
   }
 
   static void showRewardedAd({required void Function(RewardItem) onUserEarnedReward, void Function()? onAdDismissed}) {
-    if (_rewardedAd == null) {
-      // If ad isn't ready, just give the reward immediately to not block UX, or show error.
+    if (!showAds || _rewardedAd == null) {
+      // If ad isn't ready or disabled, just give the reward immediately to not block UX, or show error.
       onUserEarnedReward(RewardItem(10, 'coins'));
       onAdDismissed?.call();
       return;
@@ -165,6 +203,8 @@ class AdHelper {
   }
 
   static void showAppOpenAdIfAvailable() {
+    if (!showAds) return;
+    
     if (!_isAdAvailable) {
       loadAppOpenAd();
       return;

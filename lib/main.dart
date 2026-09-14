@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/router.dart';
 import 'core/utils/ad_helper.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'services/local_storage_service.dart';
 import 'providers/data_providers.dart';
 import 'services/notification_service.dart';
@@ -20,12 +21,9 @@ void main() async {
     ),
   );
   
-  await AdHelper.initialize();
+  await Firebase.initializeApp();
   
-  await Supabase.initialize(
-    url: 'https://vtbwsujhciftwdfigppd.supabase.co',
-    anonKey: 'sb_publishable_Jf7cYoBjVrkjeT-wyZNpOQ_vPWkdLvf',
-  );
+  await AdHelper.initialize();
 
   // Initialize notifications
   await NotificationService.instance.init();

@@ -1,0 +1,9 @@
+{
+  "name": "firebase-upload-script",
+  "version": "1.0.0",
+  "description": "Script to upload categories to Firebase",
+  "main": "upload_categories.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

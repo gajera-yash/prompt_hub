@@ -16,7 +16,9 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    if (AdHelper.showAds) {
+      _loadAd();
+    }
   }
 
   void _loadAd() {
@@ -49,6 +51,8 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AdHelper.showAds) return const SizedBox.shrink();
+
     if (_isLoaded && _bannerAd != null) {
       return Container(
         alignment: Alignment.center,

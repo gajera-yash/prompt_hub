@@ -110,6 +110,60 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: promptAsync.when(
+        data: (prompt) {
+          if (prompt == null) return const SizedBox.shrink();
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              MediaQuery.of(context).padding.bottom + AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              border: Border(
+                top: BorderSide(
+                  color: AppColors.border.withValues(alpha: 0.6),
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: GradientButton(
+              text: 'Copy Prompt',
+              icon: LucideIcons.copy,
+              onPressed: () {
+                AdHelper.showRewardedAd(
+                  onUserEarnedReward: (reward) {},
+                  onAdDismissed: () {
+                    Clipboard.setData(ClipboardData(text: _currentPromptContent));
+                    HapticFeedback.selectionClick();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Prompt copied to clipboard!'),
+                          backgroundColor: AppColors.surface,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+      ),
       body: promptAsync.when(
         data: (prompt) {
           if (prompt == null) {
@@ -275,35 +329,6 @@ class _PromptDetailScreenState extends ConsumerState<PromptDetailScreen> {
 
                 const SizedBox(height: AppSpacing.xl),
 
-                // Copy Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: GradientButton(
-                    text: 'Copy Prompt',
-                    icon: LucideIcons.copy,
-                    onPressed: () {
-                      AdHelper.showRewardedAd(
-                        onUserEarnedReward: (reward) {},
-                        onAdDismissed: () {
-                          Clipboard.setData(ClipboardData(text: _currentPromptContent));
-                          HapticFeedback.selectionClick();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Prompt copied to clipboard!'),
-                                backgroundColor: AppColors.surface,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
-                          }
-                        },
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.xl),
 
                 // Actions: AI Direct Launch Section
                 Padding(

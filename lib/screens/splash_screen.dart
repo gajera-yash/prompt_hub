@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:in_app_update/in_app_update.dart';
 import '../services/local_storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -14,6 +15,42 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    _checkForUpdateAndNavigate();
+  }
+
+  Future<void> _checkForUpdateAndNavigate() async {
+    bool shouldUpdate = false;
+    try {
+      // Skip update check in debug mode or add timeout
+      if (Theme.of(context).platform == TargetPlatform.android) {
+        // We use a timeout to prevent the app from hanging on the splash screen
+        final updateInfo = await InAppUpdate.checkForUpdate().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => throw Exception('Update check timed out'),
+        );
+        if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable ||
+            updateInfo.updateAvailability == UpdateAvailability.developerTriggeredUpdateInProgress) {
+          shouldUpdate = true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Check for update failed (network/play store issue): $e');
+      _navigateToNext();
+      return;
+    }
+
+    if (shouldUpdate) {
+      try {
+        await InAppUpdate.performImmediateUpdate();
+        if (mounted) _checkForUpdateAndNavigate(); 
+      } catch (e) {
+        debugPrint('Perform update failed (user cancelled or error): $e');
+        // Do not force infinite loop, just proceed if update fails
+        _navigateToNext();
+      }
+      return;
+    }
+    
     _navigateToNext();
   }
 
@@ -25,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen> {
       final storage = await LocalStorageService.getInstance();
       
       // FOR TESTING: Reset onboarding status so it shows every time
-      await storage.setHasSeenOnboarding(false);
+      // await storage.setHasSeenOnboarding(false);
       
       final hasSeen = storage.hasSeenOnboarding();
       final hasPreferences = storage.getUserPreferences() != null;

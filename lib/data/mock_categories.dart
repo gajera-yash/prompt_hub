@@ -7,7 +7,7 @@ class AppCategories {
       'ChatGPT', 'Gemini', 'Claude', 'DeepSeek', 'Perplexity', 'Cursor AI', 'GitHub Copilot', 'Prompt Engineering'
     ],
     'Image Generation': [
-      'Midjourney', 'DALL·E', 'Flux AI', 'Leonardo AI', 'Stable Diffusion', 'Runway ML', 'Sora Video Prompts', 'Image Generation'
+      'Midjourney', 'DALL·E', 'Flux AI', 'Leonardo AI', 'Stable Diffusion', 'Runway ML', 'Sora Video Prompts', 'Image Generation', 'ChatGPT', 'Gemini'
     ],
     'Content Creation': [
       'YouTube Scripts', 'YouTube Titles', 'YouTube Descriptions', 'Instagram Captions', 'Instagram Reels', 'TikTok Ideas', 'Facebook Posts', 'LinkedIn Posts', 'X (Twitter) Threads', 'Pinterest Pins', 'Podcast Scripts', 'Blog Writing', 'Newsletter Writing', 'Storytelling'

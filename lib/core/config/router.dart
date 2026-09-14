@@ -13,7 +13,8 @@ import '../../screens/premium_screen.dart';
 import '../../screens/custom_prompt_screen.dart';
 import '../../screens/prompt_generator_screen.dart';
 import '../../screens/terms_conditions_screen.dart';
-
+import '../../screens/trending_photos_screen.dart';
+import '../../screens/personalized_prompts_screen.dart';
 final goRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
@@ -78,6 +79,14 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/custom-prompt',
       builder: (context, state) => const CustomPromptScreen(),
+    ),
+    GoRoute(
+      path: '/trending-photos',
+      builder: (context, state) => const TrendingPhotosScreen(),
+    ),
+    GoRoute(
+      path: '/personalized-prompts',
+      builder: (context, state) => const PersonalizedPromptsScreen(),
     ),
   ],
 );

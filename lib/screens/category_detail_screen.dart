@@ -50,8 +50,13 @@ class CategoryDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(categoryPromptsProvider(categoryName));
+          await ref.read(categoryPromptsProvider(categoryName).future);
+        },
+        child: CustomScrollView(
+          slivers: [
           SliverAppBar(
             expandedHeight: 180.0,
             floating: false,
@@ -195,6 +200,7 @@ class CategoryDetailScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

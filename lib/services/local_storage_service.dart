@@ -120,4 +120,15 @@ class LocalStorageService {
     final list = notifications.map((e) => json.encode(e)).toList();
     await _prefs.setStringList('scheduledNotificationsJson', list);
   }
+
+  // ─── In-App Review ───
+  bool hasShownReview() => _prefs.getBool('hasShownReview') ?? false;
+  Future<void> setHasShownReview() => _prefs.setBool('hasShownReview', true);
+
+  /// Returns number of app opens
+  int getAppOpenCount() => _prefs.getInt('appOpenCount') ?? 0;
+  Future<void> incrementAppOpenCount() async {
+    final count = getAppOpenCount();
+    await _prefs.setInt('appOpenCount', count + 1);
+  }
 }

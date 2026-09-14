@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:in_app_update/in_app_update.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/data_providers.dart';
 
@@ -80,15 +81,112 @@ class SettingsScreen extends ConsumerWidget {
           _buildListTile(context, LucideIcons.fileText, 'Terms & Conditions', () {
             context.push('/terms');
           }),
-          _buildListTile(context, LucideIcons.info, 'App Version', () {}, subtitle: 'v1.0.0'),
+          _buildListTile(
+            context,
+            LucideIcons.info,
+            'App Version',
+            () => _handleCheckForUpdate(context),
+            subtitle: 'v1.2.0 (Check for updates)',
+          ),
           _buildListTile(context, LucideIcons.star, 'Rate App', () async {
-            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.setuvio.ai_prompt_hub&hl=en');
+            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.ai_prompt_hub.setuvio&hl=en');
             try {
               await launchUrl(url, mode: LaunchMode.externalApplication);
             } catch (e) {
               debugPrint('Could not launch $url');
             }
           }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleCheckForUpdate(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Checking for updates...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final updateInfo = await InAppUpdate.checkForUpdate().timeout(
+        const Duration(seconds: 4),
+      );
+
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Update Available'),
+            content: const Text('A new version of AI Prompt Hub is available. Would you like to update now?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await InAppUpdate.performImmediateUpdate();
+                  } catch (_) {
+                    final url = Uri.parse('https://play.google.com/store/apps/details?id=com.ai_prompt_hub.setuvio&hl=en');
+                    launchUrl(url, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: const Text('Update Now'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        if (!context.mounted) return;
+        _showUpToDateDialog(context);
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      _showUpToDateDialog(context);
+    }
+  }
+
+  void _showUpToDateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(LucideIcons.checkCircle, color: AppColors.accentGreen, size: 24),
+            SizedBox(width: 10),
+            Text('Up to Date'),
+          ],
+        ),
+        content: const Text('You are using the latest version of AI Prompt Hub (v1.2.0).'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final url = Uri.parse('https://play.google.com/store/apps/details?id=com.ai_prompt_hub.setuvio&hl=en');
+              launchUrl(url, mode: LaunchMode.externalApplication);
+            },
+            child: const Text('Play Store'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );

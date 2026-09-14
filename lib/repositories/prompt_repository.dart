@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/prompt_model.dart';
 import 'dart:async';
@@ -9,6 +9,7 @@ import '../data/mock_categories.dart';
 import '../services/local_storage_service.dart' as import_local_storage;
 
 abstract class PromptRepository {
+  Stream<void> get onUpdate;
   Future<List<PromptModel>> getFeaturedPrompts();
   Future<List<PromptModel>> getTrendingPrompts();
   Future<List<PromptModel>> getRecentPrompts();
@@ -17,19 +18,121 @@ abstract class PromptRepository {
   Future<List<PromptModel>> getPromptsByCategory(String category);
   Future<PromptModel?> getPromptById(String id);
   Future<List<PromptModel>> getTrendingPhotos();
+  List<PromptModel> getLocalTrendingPhotos();
+  Future<int> getCountByCategory(String category);
 }
 
 class HybridPromptRepository implements PromptRepository {
-  List<PromptModel> _dummyPrompts = [];
+  final _updateController = StreamController<void>.broadcast();
+  @override
+  Stream<void> get onUpdate => _updateController.stream;
+
+  static final List<PromptModel> _defaultTrendingPhotos = [
+    PromptModel(
+      id: 'photo_1',
+      title: 'Cyberpunk Cityscape',
+      description: 'A futuristic city with neon lights.',
+      content: 'A highly detailed cyberpunk cityscape at night, raining, neon signs, reflections on wet pavement, flying cars, 8k resolution, unreal engine 5 render, cinematic lighting.',
+      aiTool: 'Midjourney',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1601042879364-f3947d3f9c16?q=80&w=600&auto=format&fit=crop',
+      copyCount: 1205,
+    ),
+    PromptModel(
+      id: 'photo_2',
+      title: 'Minimalist Workspace',
+      description: 'Clean and modern desk setup.',
+      content: 'A clean minimalist workspace, wooden desk, modern monitor, mechanical keyboard, small potted plant, natural sunlight from a window, soft shadows, photorealistic.',
+      aiTool: 'DALL-E 3',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=600&auto=format&fit=crop',
+      copyCount: 850,
+    ),
+    PromptModel(
+      id: 'photo_3',
+      title: 'Enchanted Forest',
+      description: 'Magical forest with glowing mushrooms.',
+      content: 'An enchanted forest at dusk, giant glowing mushrooms, bioluminescent plants, fairy lights, magical atmosphere, fantasy art style, highly detailed.',
+      aiTool: 'Stable Diffusion',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=600&auto=format&fit=crop',
+      copyCount: 2340,
+    ),
+    PromptModel(
+      id: 'photo_4',
+      title: 'Abstract Fluid Art',
+      description: 'Vibrant fluid waves.',
+      content: 'Abstract fluid art, swirling colors of gold, deep blue, and magenta, metallic reflections, macro photography style, highly detailed, 8k.',
+      aiTool: 'Midjourney',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=600&auto=format&fit=crop',
+      copyCount: 432,
+    ),
+    PromptModel(
+      id: 'photo_5',
+      title: 'Futuristic Cyber Samurai',
+      description: 'Cybernetic armor with glowing katana.',
+      content: 'Futuristic cyber samurai, neon armor, glowing katana blade, rain reflections, volumetric fog, cinematic pose, octane render, 8k.',
+      aiTool: 'Midjourney',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop',
+      copyCount: 3100,
+    ),
+    PromptModel(
+      id: 'photo_6',
+      title: 'Cosmic Nebula Galaxy',
+      description: 'Deep space stars and galaxy clouds.',
+      content: 'Breathtaking deep space cosmic nebula, glowing stardust, vibrant purple and cyan colors, high detail astrophotography, Hubble telescope style.',
+      aiTool: 'Flux AI',
+      category: 'Image Generation',
+      imageUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=600&auto=format&fit=crop',
+      copyCount: 1950,
+    ),
+  ];
+
+  List<PromptModel> _localPrompts = [];
+  List<PromptModel> _remotePrompts = [];
+  List<PromptModel> get _allPrompts => [..._remotePrompts, ..._localPrompts];
+  
   bool _isInitialized = false;
 
-  HybridPromptRepository();
+  HybridPromptRepository() {
+    // Immediately populate default trending photos
+    _localPrompts = [..._defaultTrendingPhotos];
+  }
+
+  @override
+  List<PromptModel> getLocalTrendingPhotos() => List.unmodifiable(_defaultTrendingPhotos);
+
+  Future<void> _fetchRemotePrompts() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('prompts').orderBy('createdAt', descending: true).get();
+      
+      List<PromptModel> remotePrompts = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        remotePrompts.add(PromptModel(
+          id: doc.id,
+          title: data['title']?.toString() ?? 'Untitled',
+          description: data['instructions']?.toString() ?? '',
+          content: data['promptText']?.toString() ?? '',
+          aiTool: data['aiTool']?.toString() ?? 'ChatGPT', // Use aiTool if available
+          category: data['subcategory']?.toString() ?? data['category']?.toString() ?? 'General',
+          copyCount: (data['copyCount'] as num?)?.toInt() ?? 0,
+          imageUrl: data['imageUrl']?.toString(), // Parse image_url if exists
+        ));
+      }
+      _remotePrompts = remotePrompts;
+    } catch (e) {
+      debugPrint('Error fetching prompts from Firebase: $e');
+    }
+  }
 
   Future<void> _ensureInitialized() async {
     if (_isInitialized) return;
     
     // Load generated dummy prompts
-    _dummyPrompts = _generateHighQualityPrompts();
+    _localPrompts = _generateHighQualityPrompts();
     
     // Load image generation prompts from JSON
     try {
@@ -37,7 +140,7 @@ class HybridPromptRepository implements PromptRepository {
       final List<dynamic> jsonList = json.decode(jsonString);
       
       for (var jsonItem in jsonList) {
-        _dummyPrompts.add(PromptModel(
+        _localPrompts.add(PromptModel(
           id: jsonItem['id'],
           title: jsonItem['title'],
           description: 'A premium image generation prompt.',
@@ -50,31 +153,21 @@ class HybridPromptRepository implements PromptRepository {
       debugPrint('Error loading image generation prompts: $e');
     }
     
-    // Load prompts from Supabase
+    // Initial fetch of remote prompts
+    await _fetchRemotePrompts();
+
+    // Set up Firestore snapshot listener for silent auto-refresh
     try {
-      final response = await Supabase.instance.client.from('prompts').select('''
-        id, title, description, command, copy_count, category_id, image_url,
-        categories ( title )
-      ''');
-      final data = response as List<dynamic>;
-      for (var item in data) {
-        _dummyPrompts.add(PromptModel(
-          id: item['id'].toString(),
-          title: item['title']?.toString() ?? 'Untitled',
-          description: item['description']?.toString() ?? '',
-          content: item['command']?.toString() ?? '',
-          aiTool: 'ChatGPT', // default
-          category: item['categories']?['title']?.toString() ?? 'General',
-          copyCount: (item['copy_count'] as num?)?.toInt() ?? 0,
-          imageUrl: item['image_url']?.toString(), // Parse image_url if exists
-        ));
-      }
+      FirebaseFirestore.instance.collection('prompts').snapshots().listen((snapshot) async {
+        await _fetchRemotePrompts();
+        _updateController.add(null);
+      });
     } catch (e) {
-      debugPrint('Error fetching prompts from Supabase: $e');
+      debugPrint('Error setting up Firebase subscription: $e');
     }
 
     // Add some dummy trending photos for demonstration
-    _dummyPrompts.addAll([
+    _localPrompts.addAll([
       PromptModel(
         id: 'photo_1',
         title: 'Cyberpunk Cityscape',
@@ -122,7 +215,7 @@ class HybridPromptRepository implements PromptRepository {
       final storage = await import_local_storage.LocalStorageService.getInstance();
       final customJsonList = storage.getCustomPromptsJson();
       for (var jsonStr in customJsonList) {
-        _dummyPrompts.add(PromptModel.fromJson(json.decode(jsonStr)));
+        _localPrompts.add(PromptModel.fromJson(json.decode(jsonStr)));
       }
     } catch (e) {
       debugPrint('Error loading custom prompts: $e');
@@ -132,7 +225,7 @@ class HybridPromptRepository implements PromptRepository {
   }
 
   void addCustomPromptToMemory(PromptModel prompt) {
-    _dummyPrompts.add(prompt);
+    _localPrompts.add(prompt);
   }
 
   List<PromptModel> _generateHighQualityPrompts() {
@@ -282,34 +375,35 @@ class HybridPromptRepository implements PromptRepository {
   @override
   Future<List<PromptModel>> getFeaturedPrompts() async {
     await _ensureInitialized();
-    return _dummyPrompts.take(15).toList();
+    return _allPrompts.take(15).toList();
   }
 
   @override
   Future<List<PromptModel>> getTrendingPrompts() async {
     await _ensureInitialized();
-    final sorted = List<PromptModel>.from(_dummyPrompts)..sort((a, b) => b.copyCount.compareTo(a.copyCount));
+    final sorted = List<PromptModel>.from(_allPrompts)..sort((a, b) => b.copyCount.compareTo(a.copyCount));
     return sorted.take(20).toList();
   }
 
   @override
   Future<List<PromptModel>> getRecentPrompts() async {
     await _ensureInitialized();
-    return _dummyPrompts.reversed.take(20).toList();
+    // Since remote prompts are first in _allPrompts, this takes newest first
+    return _allPrompts.take(20).toList();
   }
 
   @override
   Future<PromptModel> getDailyPrompt() async {
     await _ensureInitialized();
-    if (_dummyPrompts.isEmpty) throw Exception('No prompts available');
-    return _dummyPrompts.first;
+    if (_allPrompts.isEmpty) throw Exception('No prompts available');
+    return _allPrompts.first;
   }
 
   @override
   Future<List<PromptModel>> searchPrompts(String query) async {
     await _ensureInitialized();
     final lowercaseQuery = query.toLowerCase();
-    return _dummyPrompts.where((p) => 
+    return _allPrompts.where((p) => 
       p.title.toLowerCase().contains(lowercaseQuery) || 
       p.content.toLowerCase().contains(lowercaseQuery) ||
       p.category.toLowerCase().contains(lowercaseQuery) // Added category search support
@@ -319,14 +413,14 @@ class HybridPromptRepository implements PromptRepository {
   @override
   Future<List<PromptModel>> getPromptsByCategory(String category) async {
     await _ensureInitialized();
-    return _dummyPrompts.where((p) => p.category.toLowerCase() == category.toLowerCase()).toList();
+    return _allPrompts.where((p) => p.category.toLowerCase() == category.toLowerCase()).toList();
   }
 
   @override
   Future<PromptModel?> getPromptById(String id) async {
     await _ensureInitialized();
     try {
-      return _dummyPrompts.firstWhere((p) => p.id == id);
+      return _allPrompts.firstWhere((p) => p.id == id);
     } catch (_) {
       return null;
     }
@@ -335,10 +429,21 @@ class HybridPromptRepository implements PromptRepository {
   @override
   Future<List<PromptModel>> getTrendingPhotos() async {
     await _ensureInitialized();
-    // Return prompts that have an image url
-    final photos = _dummyPrompts.where((p) => p.imageUrl != null).toList();
-    photos.sort((a, b) => b.copyCount.compareTo(a.copyCount));
+    // Return prompts that have a valid image url, prioritize remote ones
+    final photos = _allPrompts.where((p) => p.imageUrl != null && p.imageUrl!.trim().isNotEmpty).toList();
+    // Sort logic: if copyCount is 0 (newly added from admin), give it a boost to show up at the front
+    photos.sort((a, b) {
+      int scoreA = a.copyCount == 0 ? 10000 : a.copyCount;
+      int scoreB = b.copyCount == 0 ? 10000 : b.copyCount;
+      return scoreB.compareTo(scoreA);
+    });
     return photos;
+  }
+  @override
+  Future<int> getCountByCategory(String category) async {
+    await _ensureInitialized();
+    final normalized = category.toLowerCase().trim();
+    return _allPrompts.where((p) => p.category.toLowerCase().trim() == normalized).length;
   }
 }
 

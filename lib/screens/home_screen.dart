@@ -14,8 +14,10 @@ import '../widgets/banner_ad_widget.dart';
 import '../widgets/section_header.dart';
 import '../widgets/custom_search_bar.dart';
 import '../widgets/feature_banner_card.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/skeleton_loading.dart';
 import '../services/notification_service.dart';
+import '../services/review_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -25,18 +27,24 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final PageController _pageController = PageController();
+  final PageController _pageController = PageController(viewportFraction: 0.92);
 
   @override
   void initState() {
     super.initState();
     _requestNotificationPermission();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Trigger categories sync in background
+      ref.read(categoriesProvider);
+      // Request in-app review after enough app opens
+      ReviewService.instance.checkAndRequestReview(openThreshold: 5);
+    });
   }
 
   Future<void> _requestNotificationPermission() async {
     await NotificationService.instance.requestPermissions();
     
-    // Also schedule daily prompts once permission might be granted
+    // Schedule daily prompt notifications
     try {
       final repo = ref.read(promptRepositoryProvider);
       final allPrompts = await repo.getRecentPrompts();
@@ -45,6 +53,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } catch (e) {
       debugPrint('Error scheduling daily prompts: $e');
+    }
+
+    // Schedule trending photo notifications
+    try {
+      final repo = ref.read(promptRepositoryProvider);
+      final trendingPhotos = await repo.getTrendingPhotos();
+      if (trendingPhotos.isNotEmpty) {
+        await NotificationService.instance.scheduleDailyTrendingPhotos(trendingPhotos);
+      }
+    } catch (e) {
+      debugPrint('Error scheduling trending photo notifications: $e');
     }
   }
 
@@ -83,8 +102,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(featuredPromptsProvider);
+            ref.invalidate(personalizedPromptsProvider);
+            ref.invalidate(promptUpdateStreamProvider);
+            await ref.read(trendingPhotosProvider.notifier).refresh();
+          },
+          child: CustomScrollView(
+            slivers: [
             // App Bar
             SliverToBoxAdapter(
               child: Padding(
@@ -106,45 +132,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 children: [
                   SizedBox(
-                    height: 220,
+                    height: 195,
                     child: PageView(
                       controller: _pageController,
                       children: [
                         FeatureBannerCard(
                           title: 'Master ChatGPT',
-                          subtitle: 'Top 100 prompts for writing',
+                          subtitle: 'Top 100+ high-converting prompts',
+                          tag: 'OPENAI • CHATGPT',
                           icon: LucideIcons.bot,
-                          gradientColors: const [Color(0xFF7C4DFF), Color(0xFFB388FF)],
+                          gradientColors: const [
+                            Color(0xFF10A37F), // Official ChatGPT Green
+                            Color(0xFF0D8C6C),
+                            Color(0xFF075E54),
+                          ],
                           onTryNow: () => context.push('/category/ChatGPT'),
                         ),
                         FeatureBannerCard(
+                          title: 'Midjourney Art',
+                          subtitle: 'Photorealistic & 8K image prompts',
+                          tag: 'MIDJOURNEY • V6',
+                          icon: LucideIcons.image,
+                          gradientColors: const [
+                            Color(0xFF2E1065), // Midjourney Deep Cosmic Violet
+                            Color(0xFF4C1D95),
+                            Color(0xFF6D28D9),
+                          ],
+                          onTryNow: () => context.push('/category/Midjourney'),
+                        ),
+                        FeatureBannerCard(
                           title: 'Code Like a Pro',
-                          subtitle: 'Boost your dev workflow',
-                          icon: LucideIcons.code,
-                          gradientColors: const [Color(0xFF00E5FF), Color(0xFF69F0AE)],
+                          subtitle: 'Supercharge your dev workflow',
+                          tag: 'REACT • DEV TOOLS',
+                          icon: LucideIcons.code2,
+                          gradientColors: const [
+                            Color(0xFF087EA4), // Official React Cyan Blue
+                            Color(0xFF0284C7),
+                            Color(0xFF00B4D8),
+                          ],
                           onTryNow: () => context.push('/category/React'),
                         ),
                         FeatureBannerCard(
-                          title: 'Marketing Magic',
-                          subtitle: 'Generate high-converting copy',
-                          icon: LucideIcons.megaphone,
-                          gradientColors: const [Color(0xFFFF6B9D), Color(0xFFFF8A65)],
+                          title: 'Viral Marketing',
+                          subtitle: 'SEO, Ads & social media copy',
+                          tag: 'SEO • GROWTH',
+                          icon: LucideIcons.trendingUp,
+                          gradientColors: const [
+                            Color(0xFFEA580C), // Marketing Flame Orange
+                            Color(0xFFD97706),
+                            Color(0xFFB45309),
+                          ],
                           onTryNow: () => context.push('/category/SEO Articles'),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.sm),
                   SmoothPageIndicator(
                     controller: _pageController,
-                    count: 3,
+                    count: 4,
                     effect: ExpandingDotsEffect(
                       activeDotColor: AppColors.primary,
-                      dotColor: AppColors.border,
-                      dotHeight: 6,
+                      dotColor: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.1),
+                      dotHeight: 5,
                       dotWidth: 6,
-                      expansionFactor: 3,
-                      spacing: 6,
+                      expansionFactor: 3.5,
+                      spacing: 5,
                     ),
                   ),
                 ],
@@ -271,7 +326,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: SectionHeader(
                   title: _buildPersonalizedSectionTitle(),
-                  onSeeAll: () {},
+                  onSeeAll: () {
+                    context.push('/personalized-prompts');
+                  },
                 ),
               ),
             ),
@@ -288,6 +345,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 120)), // Bottom padding for FAB + nav
           ],
+          ),
         ),
       ),
     );
@@ -373,7 +431,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return personalizedAsync.when(
       data: (prompts) {
-        final displayPrompts = prompts;
+        final displayPrompts = prompts.length > 8 ? prompts.sublist(0, 8) : prompts;
 
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -409,9 +467,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (context, index) => const Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
-              child: SkeletonLoading(width: double.infinity, height: 130, borderRadius: AppSpacing.radiusMd),
+            (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: const SkeletonLoading(width: double.infinity, height: 130, borderRadius: AppSpacing.radiusMd),
             ),
             childCount: 4,
           ),
@@ -426,99 +484,100 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildTrendingPhotosList() {
-    final trendingPhotosAsync = ref.watch(trendingPhotosProvider);
+    final photos = ref.watch(trendingPhotosProvider);
+    if (photos.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
 
-    return trendingPhotosAsync.when(
-      data: (photos) {
-        if (photos.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-        return SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: SectionHeader(
-                  title: '🖼️ Trending Photos',
-                  onSeeAll: () {},
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                height: 200,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  itemCount: photos.length,
-                  itemBuilder: (context, index) {
-                    final photo = photos[index];
-                    return GestureDetector(
-                      onTap: () => context.push('/prompt/${photo.id}'),
-                      child: Container(
-                        width: 160,
-                        margin: const EdgeInsets.only(right: AppSpacing.md),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                          image: DecorationImage(
-                            image: NetworkImage(photo.imageUrl!),
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: SectionHeader(
+              title: '🖼️ Trending Photos',
+              onSeeAll: () {
+                context.push('/trending-photos');
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 200,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              itemCount: photos.length > 8 ? 8 : photos.length,
+              itemBuilder: (context, index) {
+                final photo = photos[index];
+                return GestureDetector(
+                  onTap: () => context.push('/prompt/${photo.id}'),
+                  child: Container(
+                    width: 160,
+                    margin: const EdgeInsets.only(right: AppSpacing.md),
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      color: AppColors.surface,
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (photo.imageUrl != null && photo.imageUrl!.isNotEmpty)
+                          CachedNetworkImage(
+                            imageUrl: photo.imageUrl!,
                             fit: BoxFit.cover,
-                          ),
-                        ),
-                        alignment: Alignment.bottomLeft,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppSpacing.radiusLg)),
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.8),
-                                Colors.transparent,
-                              ],
+                            placeholder: (context, url) => Container(
+                              color: AppColors.surface,
+                              child: const Center(
+                                child: Icon(LucideIcons.image, color: AppColors.textMuted, size: 28),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: AppColors.surface,
+                              child: const Center(
+                                child: Icon(LucideIcons.imageOff, color: AppColors.textMuted, size: 28),
+                              ),
                             ),
                           ),
-                          child: Text(
-                            photo.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.85),
+                                  Colors.transparent,
+                                ],
+                              ),
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                            child: Text(
+                              photo.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        );
-      },
-      loading: () => SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SkeletonLoading(width: 150, height: 24, borderRadius: 4),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: const [
-                  SkeletonLoading(width: 160, height: 200, borderRadius: AppSpacing.radiusLg),
-                  SizedBox(width: AppSpacing.md),
-                  SkeletonLoading(width: 160, height: 200, borderRadius: AppSpacing.radiusLg),
-                ],
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
-      error: (e, st) => const SliverToBoxAdapter(child: SizedBox.shrink()),
     );
   }
 }
+
 
